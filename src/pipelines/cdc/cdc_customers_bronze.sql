@@ -30,9 +30,9 @@ AS SELECT
     _metadata.file_modification_time AS _file_modified_at,
     current_timestamp() AS _ingested_at
 FROM STREAM read_files(
-    '/Volumes/${catalog}/raw/olist/cdc/customers/',
-    format => 'csv',
+    "/Volumes/${catalog}/raw/olist/cdc/customers/",
+    format => "csv",
     header => true,
     inferSchema => true,
-    rescuedDataColumn => '_rescued_data'
+    rescuedDataColumn => "_rescued_data"
 );
