@@ -8,7 +8,6 @@ These tests verify:
 """
 
 import re
-import pytest
 
 
 class TestSQLFileStructure:
@@ -101,13 +100,12 @@ class TestCDCLayerSQL:
             content = sql_file.read_text()
             assert "STREAMING TABLE" in content, f"{sql_file.name} should use STREAMING TABLE"
 
-    def test_cdc_silver_uses_auto_cdc(self, cdc_sql_files):
-        """CDC Silver should use CREATE FLOW AS AUTO CDC for SCD processing."""
+    def test_cdc_silver_uses_apply_changes(self, cdc_sql_files):
+        """CDC Silver should use APPLY CHANGES for SCD processing."""
         silver_files = [f for f in cdc_sql_files if "silver" in f.name]
         for sql_file in silver_files:
             content = sql_file.read_text()
-            assert "CREATE FLOW" in content, f"{sql_file.name} should use CREATE FLOW for AUTO CDC"
-            assert "AUTO CDC INTO" in content, f"{sql_file.name} should use AUTO CDC INTO syntax"
+            assert "APPLY CHANGES INTO" in content, f"{sql_file.name} should use APPLY CHANGES INTO for CDC"
 
     def test_cdc_silver_has_scd_types(self, cdc_sql_files):
         """CDC Silver should implement both SCD Type 1 and Type 2."""

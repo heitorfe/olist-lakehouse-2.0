@@ -40,26 +40,26 @@ AS SELECT
     CAST(product_photos_qty AS INT) AS product_photos_qty,
 
     -- Physical dimensions
-    CAST(product_weight_g AS DECIMAL(10,2)) AS product_weight_g,
-    CAST(product_length_cm AS DECIMAL(10,2)) AS product_length_cm,
-    CAST(product_height_cm AS DECIMAL(10,2)) AS product_height_cm,
-    CAST(product_width_cm AS DECIMAL(10,2)) AS product_width_cm,
+    CAST(product_weight_g AS DECIMAL(10, 2)) AS product_weight_g,
+    CAST(product_length_cm AS DECIMAL(10, 2)) AS product_length_cm,
+    CAST(product_height_cm AS DECIMAL(10, 2)) AS product_height_cm,
+    CAST(product_width_cm AS DECIMAL(10, 2)) AS product_width_cm,
 
     -- Derived: Volume in cubic centimeters
     CASE
         WHEN product_length_cm IS NOT NULL
             AND product_height_cm IS NOT NULL
             AND product_width_cm IS NOT NULL
-        THEN CAST(product_length_cm AS DECIMAL(10,2)) *
-             CAST(product_height_cm AS DECIMAL(10,2)) *
-             CAST(product_width_cm AS DECIMAL(10,2))
+        THEN CAST(product_length_cm AS DECIMAL(10, 2)) *
+             CAST(product_height_cm AS DECIMAL(10, 2)) *
+             CAST(product_width_cm AS DECIMAL(10, 2))
         ELSE NULL
     END AS product_volume_cm3,
 
     -- Derived: Weight in kilograms
     CASE
         WHEN product_weight_g IS NOT NULL
-        THEN CAST(product_weight_g AS DECIMAL(10,2)) / 1000.0
+        THEN CAST(product_weight_g AS DECIMAL(10, 2)) / 1000.0
         ELSE NULL
     END AS product_weight_kg,
 

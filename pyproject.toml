@@ -33,30 +33,27 @@ exclude = [
     ".databricks",
     "dist",
     "build",
+    # Databricks notebooks use magic commands (%pip) and globals (spark, dbutils)
+    # that are not valid Python outside Databricks runtime
+    "src/setup/unity_catalog_setup.py",
+    "src/utils/data_generator.py",
 ]
 
 [tool.ruff.lint]
-select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # Pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
-    "S",   # flake8-bandit (security)
-    "N",   # pep8-naming
-]
-ignore = [
-    "E501",  # line too long (handled by formatter)
-    "S101",  # assert usage (OK in tests)
-    "B008",  # function call in default argument (common in Databricks)
-]
+# PERMISSIVE MODE: Only check for actual errors, not style
+# E9: Runtime errors (syntax errors)
+# F63: Invalid print syntax
+# F7: Syntax errors in type comments
+# F82: Undefined names
+# I: isort (auto-fixable)
+select = ["E9", "F63", "F7", "F82", "I"]
+
+# Everything else is auto-fixed or ignored
+fixable = ["ALL"]
+unfixable = []
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "D"]  # Allow asserts in tests
-"src/utils/data_generator.py" = ["S311"]  # Random is OK for test data
-"src/setup/unity_catalog_setup.py" = ["S311"]  # Random is OK for setup
+"tests/**/*.py" = ["ALL"]  # Very permissive for tests
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]

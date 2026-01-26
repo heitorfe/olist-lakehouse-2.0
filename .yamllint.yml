@@ -4,6 +4,8 @@
 extends: default
 
 rules:
+  new-lines: disable  # Disable line-ending checks (mixed dev environments)
+
   line-length:
     max: 150
     level: warning

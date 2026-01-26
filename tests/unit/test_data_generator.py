@@ -5,10 +5,8 @@ These tests verify the logic patterns used in data_generator.py
 without requiring a Spark session or Databricks environment.
 """
 
-import uuid
 import random
-import pytest
-
+import uuid
 
 # ============================================================================
 # Helper functions (patterns from data_generator.py)

@@ -52,11 +52,7 @@ AS SELECT
     END AS response_days,
 
     -- Has comment flag
-    CASE
-        WHEN review_comment_message IS NOT NULL AND LENGTH(TRIM(review_comment_message)) > 0
-        THEN TRUE
-        ELSE FALSE
-    END AS has_comment,
+    coalesce (review_comment_message IS NOT NULL AND LENGTH(TRIM(review_comment_message)) > 0, false) AS has_comment,
 
     -- Audit columns
     _source_file,

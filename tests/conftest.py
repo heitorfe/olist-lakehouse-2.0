@@ -2,8 +2,9 @@
 Pytest configuration and shared fixtures for Olist Lakehouse tests.
 """
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 @pytest.fixture(scope="session")
