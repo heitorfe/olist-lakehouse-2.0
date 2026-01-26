@@ -1,0 +1,64 @@
+.claude
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE settings
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Databricks
+.databricks/
+*.whl
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secrets and credentials
+.env
+.env.local
+*.pem
+*.key
+credentials.json
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Data files (large datasets should not be committed)
+data/
+*.csv
+*.parquet
+*.json
+!resources/*.yml
+!resources/*.json
