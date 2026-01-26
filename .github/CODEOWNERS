@@ -1,0 +1,19 @@
+# CODEOWNERS - Define code ownership for pull request reviews
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for all files
+# Uncomment and replace with your team/usernames
+# * @data-engineering-team
+
+# Pipeline SQL files - require data engineer review
+# /src/pipelines/ @data-engineering-team @pipeline-reviewers
+
+# Production configuration - require senior review
+# /databricks.yml @senior-data-engineers
+# /resources/ @senior-data-engineers
+
+# CI/CD workflows - require DevOps review
+# /.github/ @devops-team @data-engineering-team
+
+# Tests - any engineer can review
+# /tests/ @data-engineering-team

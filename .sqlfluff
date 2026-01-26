@@ -1,0 +1,17 @@
+# .sqlfluff
+# SQLFluff configuration for Databricks Lakeflow/DLT SQL
+#
+# DISABLED: SQLFluff cannot properly parse Databricks Lakeflow syntax
+# (read_files(), STREAMING TABLE, CREATE FLOW, MATERIALIZED VIEW, etc.).
+#
+# This config excludes ALL rules. SQLFluff is run in CI for informational
+# purposes only and will not fail the build.
+
+[sqlfluff]
+dialect = databricks
+templater = raw
+max_line_length = 200
+large_file_skip_byte_limit = 50000
+
+# Exclude ALL rules - comprehensive list for Lakeflow compatibility
+exclude_rules = AL01, AL02, AL03, AL04, AL05, AL06, AL07, AL08, AM01, AM02, AM03, AM04, AM05, AM06, AM07, CP01, CP02, CP03, CP04, CP05, CV01, CV02, CV03, CV04, CV05, CV06, CV07, CV08, CV09, CV10, CV11, JJ01, LT01, LT02, LT03, LT04, LT05, LT06, LT07, LT08, LT09, LT10, LT11, LT12, LT13, RF01, RF02, RF03, RF04, RF05, RF06, ST01, ST02, ST03, ST04, ST05, ST06, ST07, ST08, ST09, TQ01

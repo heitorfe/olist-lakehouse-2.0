@@ -43,11 +43,11 @@ AS SELECT
     TO_TIMESTAMP(shipping_limit_date) AS shipping_limit_date,
 
     -- Financial data (as DECIMAL for precision)
-    CAST(price AS DECIMAL(10,2)) AS price,
-    CAST(freight_value AS DECIMAL(10,2)) AS freight_value,
+    CAST(price AS DECIMAL(10, 2)) AS price,
+    CAST(freight_value AS DECIMAL(10, 2)) AS freight_value,
 
     -- Calculated fields
-    CAST(price AS DECIMAL(10,2)) + CAST(freight_value AS DECIMAL(10,2)) AS total_item_value,
+    CAST(price AS DECIMAL(10, 2)) + CAST(freight_value AS DECIMAL(10, 2)) AS total_item_value,
 
     -- Audit columns
     _source_file,

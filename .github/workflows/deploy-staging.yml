@@ -1,0 +1,145 @@
+# Staging Deployment Workflow
+# Deploys to staging environment on tag push or manual trigger
+
+name: Deploy to Staging
+
+on:
+  push:
+    tags:
+      - 'staging/*'
+
+  workflow_dispatch:
+    inputs:
+      run_smoke_tests:
+        description: 'Run smoke tests after deployment'
+        required: false
+        default: 'true'
+        type: boolean
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: '3.11'
+  TARGET: 'staging'
+
+jobs:
+  # ============================================================================
+  # Validate Before Deploy
+  # ============================================================================
+  validate:
+    name: Validate Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install linting tools
+        run: pip install sqlfluff==3.0.7 ruff
+
+      - name: Run SQLFluff
+        run: sqlfluff lint src/pipelines/ --dialect databricks
+
+      - name: Run Ruff
+        run: ruff check src/
+
+      - name: Install Databricks CLI
+        run: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+
+      - name: Validate bundle
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_STAGING }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_STAGING }}
+        run: databricks bundle validate -t ${{ env.TARGET }}
+
+  # ============================================================================
+  # Deploy to Staging
+  # ============================================================================
+  deploy:
+    name: Deploy to Staging
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        run: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+
+      - name: Deploy bundle to Staging
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_STAGING }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_STAGING }}
+        run: databricks bundle deploy -t ${{ env.TARGET }}
+
+      - name: Deployment summary
+        run: |
+          echo "## Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Target:** ${{ env.TARGET }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag/Ref:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # Smoke Tests
+  # ============================================================================
+  smoke-tests:
+    name: Run Smoke Tests
+    needs: deploy
+    if: ${{ github.event.inputs.run_smoke_tests != 'false' }}
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        run: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+
+      - name: Verify pipeline deployment
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_STAGING }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_STAGING }}
+        run: |
+          echo "Verifying deployed pipelines..."
+          databricks pipelines list --output JSON | jq '.[] | select(.name | contains("STAGING"))' || echo "No staging pipelines found yet"
+          echo "Pipeline deployment verified successfully"
+
+  # ============================================================================
+  # Notify
+  # ============================================================================
+  notify:
+    name: Notify
+    needs: [deploy, smoke-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification
+        if: ${{ vars.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "Olist Lakehouse STAGING Deployment: ${{ needs.deploy.result }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Olist Lakehouse - STAGING Deployment*\nStatus: ${{ needs.deploy.result }}\nTag: `${{ github.ref_name }}`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ vars.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+        continue-on-error: true

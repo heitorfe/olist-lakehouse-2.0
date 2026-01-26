@@ -1,0 +1,39 @@
+# .yamllint.yml
+# YAML lint configuration for Databricks Asset Bundle configs
+
+extends: default
+
+rules:
+  new-lines: disable  # Disable line-ending checks (mixed dev environments)
+
+  line-length:
+    max: 150
+    level: warning
+
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+    check-keys: false
+
+  comments:
+    require-starting-space: true
+    min-spaces-from-content: 1
+
+  document-start: disable
+
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 0
+
+ignore: |
+  .git/
+  .venv/
+  node_modules/
+  .databricks/

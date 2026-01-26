@@ -1,0 +1,102 @@
+# pyproject.toml
+# Python project configuration for Olist Lakehouse
+
+[project]
+name = "olist-lakehouse"
+version = "2.0.0"
+description = "Databricks Lakehouse project for Olist Brazilian E-commerce data"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "ruff>=0.3.0",
+    "sqlfluff>=3.0.7",
+    "yamllint>=1.35.0",
+    "pre-commit>=3.6.0",
+]
+
+# ============================================================================
+# Ruff Configuration
+# ============================================================================
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    ".databricks",
+    "dist",
+    "build",
+    # Databricks notebooks use magic commands (%pip) and globals (spark, dbutils)
+    # that are not valid Python outside Databricks runtime
+    "src/setup/unity_catalog_setup.py",
+    "src/utils/data_generator.py",
+]
+
+[tool.ruff.lint]
+# PERMISSIVE MODE: Only check for actual errors, not style
+# E9: Runtime errors (syntax errors)
+# F63: Invalid print syntax
+# F7: Syntax errors in type comments
+# F82: Undefined names
+# I: isort (auto-fixable)
+select = ["E9", "F63", "F7", "F82", "I"]
+
+# Everything else is auto-fixed or ignored
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ALL"]  # Very permissive for tests
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+# ============================================================================
+# Pytest Configuration
+# ============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+]
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (require Databricks connection)",
+    "sql: SQL validation tests",
+]
+
+# ============================================================================
+# Coverage Configuration
+# ============================================================================
+[tool.coverage.run]
+branch = true
+source = ["src"]
+omit = [
+    "tests/*",
+    "src/setup/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]

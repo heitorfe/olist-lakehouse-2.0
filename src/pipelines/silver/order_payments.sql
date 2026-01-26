@@ -37,7 +37,7 @@ AS SELECT
     -- Payment details (normalized)
     LOWER(TRIM(payment_type)) AS payment_type,
     CAST(payment_installments AS INT) AS payment_installments,
-    CAST(payment_value AS DECIMAL(10,2)) AS payment_value,
+    CAST(payment_value AS DECIMAL(10, 2)) AS payment_value,
 
     -- Payment category (derived)
     CASE

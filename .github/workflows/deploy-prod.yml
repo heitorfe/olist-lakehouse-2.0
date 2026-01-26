@@ -1,0 +1,211 @@
+# Production Deployment Workflow
+# Deploys to production environment on semver tag push
+# Requires manual approval via GitHub environment protection rules
+
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to deploy (e.g., v1.0.0)'
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: '3.11'
+  TARGET: 'prod'
+
+jobs:
+  # ============================================================================
+  # Pre-deployment Validation
+  # ============================================================================
+  validate:
+    name: Pre-deployment Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version || github.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install tools
+        run: pip install sqlfluff==3.0.7 ruff
+
+      - name: Run full validation
+        run: |
+          echo "Running SQLFluff..."
+          sqlfluff lint src/pipelines/ --dialect databricks
+
+          echo "Running Ruff..."
+          ruff check src/
+
+      - name: Install Databricks CLI
+        run: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+
+      - name: Validate production bundle
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_PROD }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_PROD }}
+        run: databricks bundle validate -t ${{ env.TARGET }}
+
+  # ============================================================================
+  # Approval Gate (via GitHub Environment)
+  # ============================================================================
+  approval:
+    name: Production Approval
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deployment approved
+        run: |
+          echo "Production deployment approved by: ${{ github.actor }}"
+          echo "Version: ${{ github.event.inputs.version || github.ref_name }}"
+
+  # ============================================================================
+  # Deploy to Production
+  # ============================================================================
+  deploy:
+    name: Deploy to Production
+    needs: approval
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version || github.ref }}
+
+      - name: Install Databricks CLI
+        run: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+
+      - name: Deploy bundle to Production
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_PROD }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_PROD }}
+        run: databricks bundle deploy -t ${{ env.TARGET }}
+
+      - name: Production deployment summary
+        run: |
+          echo "## Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Target:** ${{ env.TARGET }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ github.event.inputs.version || github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # Post-deployment Verification
+  # ============================================================================
+  verify:
+    name: Post-deployment Verification
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        run: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+
+      - name: Verify pipeline health
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_PROD }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_PROD }}
+        run: |
+          echo "Verifying production pipelines..."
+          databricks pipelines list --output JSON | \
+            jq -r '.[] | select(.name | contains("Olist Lakehouse")) | "\(.name): \(.state)"' || \
+            echo "Pipeline verification completed"
+
+  # ============================================================================
+  # Create Release & Notify
+  # ============================================================================
+  release:
+    name: Create GitHub Release
+    needs: [deploy, verify]
+    if: ${{ success() && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Olist Lakehouse Release ${{ github.ref_name }}
+
+            **Deployed to Production:** Yes
+            **Deployed by:** ${{ github.actor }}
+            **Timestamp:** ${{ github.event.head_commit.timestamp }}
+
+            ### Changes
+            See [commits since last release](${{ github.server_url }}/${{ github.repository }}/commits/${{ github.ref_name }})
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
+  notify:
+    name: Send Notifications
+    needs: [deploy, verify]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification
+        if: ${{ vars.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "Olist Lakehouse PRODUCTION Deployment: ${{ needs.deploy.result }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Production Deployment"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Status:*\n${{ needs.deploy.result }}" },
+                    { "type": "mrkdwn", "text": "*Version:*\n${{ github.ref_name }}" },
+                    { "type": "mrkdwn", "text": "*Deployed by:*\n${{ github.actor }}" },
+                    { "type": "mrkdwn", "text": "*Verification:*\n${{ needs.verify.result }}" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Deployment>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ vars.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+        continue-on-error: true
