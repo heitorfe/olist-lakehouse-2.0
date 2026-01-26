@@ -313,27 +313,30 @@ def download_kaggle_dataset(dataset_name, download_path):
 
 def upload_to_volume(local_path, volume_path, filename):
     """
-    Upload a local file to a Databricks Volume.
+    Upload a local file to a Databricks Volume using direct file I/O.
+
+    Unity Catalog Volumes are FUSE-mounted, so we can use standard Python
+    file operations to read/write directly to the Volume path.
 
     Args:
         local_path: Path to the local file
-        volume_path: Volume directory path
+        volume_path: Volume directory path (e.g., /Volumes/catalog/schema/volume/dir)
         filename: Target filename in the Volume
     """
-    # Read the local file and write to Volume
+    # Ensure target directory exists
+    os.makedirs(volume_path, exist_ok=True)
+
     target_path = f"{volume_path}/{filename}"
 
-    # Use dbutils to copy the file
-    # First, we need to copy to a DBFS path, then move to Volume
-    dbfs_temp = f"/tmp/kaggle_upload/{filename}"
+    # Read file content into memory and write directly to Volume
+    with open(local_path, 'rb') as src_file:
+        file_content = src_file.read()
 
-    # Copy local file to DBFS
-    dbutils.fs.cp(f"file:{local_path}", dbfs_temp)
+    with open(target_path, 'wb') as dst_file:
+        dst_file.write(file_content)
 
-    # Move from DBFS to Volume
-    dbutils.fs.mv(dbfs_temp, target_path)
-
-    print(f"  ✓ Uploaded to: {target_path}")
+    file_size_kb = len(file_content) / 1024
+    print(f"  ✓ Uploaded to: {target_path} ({file_size_kb:.1f} KB)")
 
 # COMMAND ----------
 
@@ -363,9 +366,9 @@ def download_and_upload_olist_dataset():
             print("⚠ No files were extracted from the dataset")
             return False
 
-        # Step 4: Create reference directory if needed
+        # Step 4: Create reference directory if needed (using Python's os module)
         reference_path = f"{base_path}/reference"
-        dbutils.fs.mkdirs(reference_path)
+        os.makedirs(reference_path, exist_ok=True)
 
         # Step 5: Upload files to Volume
         print("\n--- Uploading to Volumes ---")
