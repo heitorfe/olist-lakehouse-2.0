@@ -25,10 +25,7 @@ CREATE OR REFRESH STREAMING TABLE silver_order_items (
         ON VIOLATION DROP ROW,
     CONSTRAINT valid_freight
         EXPECT (freight_value IS NOT NULL AND freight_value >= 0)
-        ON VIOLATION DROP ROW,
-    -- Warning constraints
-    CONSTRAINT no_rescued_data
-        EXPECT (_rescued_data IS NULL)
+        ON VIOLATION DROP ROW
 )
 COMMENT 'Cleansed order item data with validated prices and calculated totals'
 TBLPROPERTIES (

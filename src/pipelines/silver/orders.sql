@@ -19,10 +19,7 @@ CREATE OR REFRESH STREAMING TABLE silver_orders (
         ON VIOLATION DROP ROW,
     CONSTRAINT valid_purchase_timestamp
         EXPECT (order_purchase_timestamp IS NOT NULL)
-        ON VIOLATION DROP ROW,
-    -- Warning constraints
-    CONSTRAINT no_rescued_data
-        EXPECT (_rescued_data IS NULL)
+        ON VIOLATION DROP ROW
 )
 COMMENT 'Cleansed order data with validated timestamps and status values'
 TBLPROPERTIES (

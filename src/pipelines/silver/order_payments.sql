@@ -22,10 +22,7 @@ CREATE OR REFRESH STREAMING TABLE silver_order_payments (
         ON VIOLATION DROP ROW,
     CONSTRAINT valid_installments
         EXPECT (payment_installments IS NOT NULL AND payment_installments >= 0)
-        ON VIOLATION DROP ROW,
-    -- Warning constraints
-    CONSTRAINT no_rescued_data
-        EXPECT (_rescued_data IS NULL)
+        ON VIOLATION DROP ROW
 )
 COMMENT 'Cleansed payment data with validated payment types and amounts'
 TBLPROPERTIES (

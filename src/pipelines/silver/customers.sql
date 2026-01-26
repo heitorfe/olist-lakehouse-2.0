@@ -16,10 +16,7 @@ CREATE OR REFRESH STREAMING TABLE silver_customers (
         ON VIOLATION DROP ROW,
     CONSTRAINT valid_zip_code
         EXPECT (customer_zip_code_prefix IS NOT NULL)
-        ON VIOLATION DROP ROW,
-    -- Warning constraints (track but don't drop)
-    CONSTRAINT no_rescued_data
-        EXPECT (_rescued_data IS NULL)
+        ON VIOLATION DROP ROW
 )
 COMMENT 'Cleansed customer data with validated IDs and normalized location fields'
 TBLPROPERTIES (

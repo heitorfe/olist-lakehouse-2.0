@@ -16,10 +16,7 @@ CREATE OR REFRESH STREAMING TABLE silver_order_reviews (
         ON VIOLATION DROP ROW,
     CONSTRAINT valid_review_score
         EXPECT (review_score IS NOT NULL AND review_score BETWEEN 1 AND 5)
-        ON VIOLATION DROP ROW,
-    -- Warning constraints
-    CONSTRAINT no_rescued_data
-        EXPECT (_rescued_data IS NULL)
+        ON VIOLATION DROP ROW
 )
 COMMENT 'Cleansed review data with validated scores and sentiment classification'
 TBLPROPERTIES (

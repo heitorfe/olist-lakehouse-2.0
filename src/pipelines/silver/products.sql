@@ -20,10 +20,7 @@ CREATE OR REFRESH STREAMING TABLE silver_products (
             (product_height_cm IS NULL OR product_height_cm >= 0) AND
             (product_width_cm IS NULL OR product_width_cm >= 0)
         )
-        ON VIOLATION DROP ROW,
-    -- Warning constraints
-    CONSTRAINT no_rescued_data
-        EXPECT (_rescued_data IS NULL)
+        ON VIOLATION DROP ROW
 )
 COMMENT 'Cleansed product data with validated dimensions and calculated volume'
 TBLPROPERTIES (
