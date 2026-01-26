@@ -1,7 +1,7 @@
 -- =============================================================================
 -- CDC Silver Layer: Seller CDC Processing (AUTO CDC)
 -- =============================================================================
--- Description: Processes seller changes using AUTO CDC (APPLY CHANGES)
+-- Description: Processes seller changes using AUTO CDC (CREATE FLOW syntax)
 -- Source: bronze_cdc_sellers
 -- Pattern: SCD Type 1 (current state) and SCD Type 2 (history tracking)
 -- =============================================================================
@@ -38,14 +38,15 @@ FROM STREAM(bronze_cdc_sellers);
 -- =============================================================================
 
 CREATE OR REFRESH STREAMING TABLE silver_sellers_current
-COMMENT 'Current state of sellers (SCD Type 1) - Updated via CDC'
+COMMENT 'Current state of sellers (SCD Type 1) - Updated via AUTO CDC'
 TBLPROPERTIES (
     'quality' = 'silver',
     'pipelines.autoOptimize.managed' = 'true'
 );
 
-APPLY CHANGES INTO silver_sellers_current
-FROM STREAM stg_cdc_sellers
+CREATE FLOW sellers_current_flow
+AS AUTO CDC INTO silver_sellers_current
+FROM stream(stg_cdc_sellers)
 KEYS (seller_id)
 APPLY AS DELETE WHEN operation = 'DELETE'
 SEQUENCE BY sequence_number
@@ -57,14 +58,15 @@ STORED AS SCD TYPE 1;
 -- =============================================================================
 
 CREATE OR REFRESH STREAMING TABLE silver_sellers_history
-COMMENT 'Historical seller changes (SCD Type 2) - Full audit trail via CDC'
+COMMENT 'Historical seller changes (SCD Type 2) - Full audit trail via AUTO CDC'
 TBLPROPERTIES (
     'quality' = 'silver',
     'pipelines.autoOptimize.managed' = 'true'
 );
 
-APPLY CHANGES INTO silver_sellers_history
-FROM STREAM stg_cdc_sellers
+CREATE FLOW sellers_history_flow
+AS AUTO CDC INTO silver_sellers_history
+FROM stream(stg_cdc_sellers)
 KEYS (seller_id)
 APPLY AS DELETE WHEN operation = 'DELETE'
 SEQUENCE BY sequence_number

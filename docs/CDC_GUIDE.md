@@ -4,6 +4,21 @@
 
 This guide explains the CDC implementation in the Olist Lakehouse project, including the data format, processing patterns, and how to work with SCD Type 1 and Type 2 tables.
 
+## AUTO CDC Syntax
+
+This project uses the **AUTO CDC** syntax (the modern replacement for `APPLY CHANGES`):
+
+```sql
+CREATE FLOW flow_name
+AS AUTO CDC INTO target_table
+FROM stream(source_table)
+KEYS (key_column)
+SEQUENCE BY sequence_column
+STORED AS SCD TYPE 1|2;
+```
+
+> **Note**: `AUTO CDC` and `APPLY CHANGES INTO` have identical functionality. AUTO CDC is the current recommended syntax in Databricks Lakeflow.
+
 ## CDC Data Format
 
 ### Change Event Structure
@@ -78,10 +93,15 @@ FROM STREAM(bronze_cdc_customers);
 #### SCD Type 1 (Current State)
 
 ```sql
-CREATE OR REFRESH STREAMING TABLE silver_customers_current;
+-- Create the target streaming table
+CREATE OR REFRESH STREAMING TABLE silver_customers_current
+COMMENT 'Current state of customers (SCD Type 1)'
+TBLPROPERTIES ('quality' = 'silver');
 
-APPLY CHANGES INTO silver_customers_current
-FROM STREAM stg_cdc_customers
+-- Create the AUTO CDC flow
+CREATE FLOW customers_current_flow
+AS AUTO CDC INTO silver_customers_current
+FROM stream(stg_cdc_customers)
 KEYS (customer_id)
 APPLY AS DELETE WHEN operation = 'DELETE'
 SEQUENCE BY sequence_number
@@ -94,10 +114,15 @@ STORED AS SCD TYPE 1;
 #### SCD Type 2 (History)
 
 ```sql
-CREATE OR REFRESH STREAMING TABLE silver_customers_history;
+-- Create the target streaming table
+CREATE OR REFRESH STREAMING TABLE silver_customers_history
+COMMENT 'Historical customer changes (SCD Type 2)'
+TBLPROPERTIES ('quality' = 'silver');
 
-APPLY CHANGES INTO silver_customers_history
-FROM STREAM stg_cdc_customers
+-- Create the AUTO CDC flow
+CREATE FLOW customers_history_flow
+AS AUTO CDC INTO silver_customers_history
+FROM stream(stg_cdc_customers)
 KEYS (customer_id)
 APPLY AS DELETE WHEN operation = 'DELETE'
 SEQUENCE BY sequence_number
@@ -106,6 +131,53 @@ STORED AS SCD TYPE 2;
 ```
 
 **Result**: Multiple rows per customer with validity periods.
+
+## AUTO CDC Syntax Reference
+
+### Complete Syntax
+
+```sql
+CREATE FLOW flow_name
+AS AUTO CDC INTO target_table
+FROM stream(source_table)
+KEYS (column1[, column2, ...])
+[APPLY AS DELETE WHEN condition]
+[APPLY AS TRUNCATE WHEN condition]
+SEQUENCE BY sequence_column
+[COLUMNS column_list | * [EXCEPT (column_list)]]
+STORED AS SCD TYPE 1|2
+[TRACK HISTORY ON column_list | * [EXCEPT (column_list)]];
+```
+
+### Key Components
+
+| Clause | Required | Description |
+|--------|----------|-------------|
+| `CREATE FLOW name` | Yes | Names the CDC processing flow |
+| `AS AUTO CDC INTO` | Yes | Specifies the target table |
+| `FROM stream(source)` | Yes | Source table wrapped in `stream()` |
+| `KEYS (columns)` | Yes | Primary key columns |
+| `APPLY AS DELETE WHEN` | No | Condition for DELETE operations |
+| `APPLY AS TRUNCATE WHEN` | No | Condition for TRUNCATE operations |
+| `SEQUENCE BY` | Yes | Column(s) for ordering events |
+| `COLUMNS` | No | Columns to include/exclude |
+| `STORED AS SCD TYPE` | Yes | 1 for current state, 2 for history |
+| `TRACK HISTORY ON` | No | SCD Type 2 only: columns to track |
+
+### Selective History Tracking (SCD Type 2)
+
+Exclude columns from creating new history versions:
+
+```sql
+CREATE FLOW customers_history_flow
+AS AUTO CDC INTO silver_customers_history
+FROM stream(stg_cdc_customers)
+KEYS (customer_id)
+SEQUENCE BY sequence_number
+COLUMNS * EXCEPT (sequence_number, operation)
+STORED AS SCD TYPE 2
+TRACK HISTORY ON * EXCEPT (customer_city);  -- City changes don't create new versions
+```
 
 ## SCD Type 2 Generated Columns
 
@@ -151,7 +223,7 @@ SEQUENCE BY sequence_number
 Use when ordering requires multiple columns:
 
 ```sql
-SEQUENCE BY struct(date_column, sequence_number)
+SEQUENCE BY STRUCT(date_column, sequence_number)
 ```
 
 ### Requirements
@@ -184,6 +256,14 @@ APPLY AS DELETE WHEN operation = 'DELETE'
 ### Hard Deletes
 
 For SCD Type 1, deleted records are removed. For SCD Type 2, a final version is created with `__END_AT` set.
+
+### Truncate Operations
+
+Handle bulk deletions:
+
+```sql
+APPLY AS TRUNCATE WHEN operation = 'TRUNCATE'
+```
 
 ## Testing CDC Processing
 
@@ -247,6 +327,37 @@ WHERE event_type = 'flow_progress'
 ORDER BY timestamp DESC;
 ```
 
+## Migration from APPLY CHANGES
+
+If migrating from `APPLY CHANGES INTO` to `CREATE FLOW AS AUTO CDC`:
+
+| Old Syntax | New Syntax |
+|------------|------------|
+| `APPLY CHANGES INTO target` | `CREATE FLOW name AS AUTO CDC INTO target` |
+| `FROM STREAM source` | `FROM stream(source)` |
+| (same) | `KEYS (columns)` |
+| (same) | `SEQUENCE BY column` |
+| (same) | `STORED AS SCD TYPE 1\|2` |
+
+**Example migration:**
+
+```sql
+-- Old (deprecated)
+APPLY CHANGES INTO silver_customers_current
+FROM STREAM stg_cdc_customers
+KEYS (customer_id)
+SEQUENCE BY sequence_number
+STORED AS SCD TYPE 1;
+
+-- New (recommended)
+CREATE FLOW customers_current_flow
+AS AUTO CDC INTO silver_customers_current
+FROM stream(stg_cdc_customers)
+KEYS (customer_id)
+SEQUENCE BY sequence_number
+STORED AS SCD TYPE 1;
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -284,3 +395,10 @@ GROUP BY operation;
 3. **Use staging table** for validation before CDC processing
 4. **Test with realistic data volumes** before production
 5. **Consider retention policies** for SCD Type 2 history
+6. **Use named flows** - Makes pipeline debugging easier
+7. **Validate in staging** - Drop invalid records before CDC processing
+
+## References
+
+- [Databricks AUTO CDC Documentation](https://docs.databricks.com/aws/en/ldp/cdc)
+- [Lakeflow Best Practices](https://docs.databricks.com/en/lakeflow/index.html)
