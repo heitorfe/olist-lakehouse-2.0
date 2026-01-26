@@ -1,0 +1,146 @@
+# =============================================================================
+# Databricks Asset Bundle Configuration - Olist Lakehouse
+# =============================================================================
+# This file defines the Databricks Asset Bundle for deploying and managing
+# the Olist Lakehouse project across different environments.
+#
+# Usage:
+#   databricks bundle validate              # Validate configuration
+#   databricks bundle deploy -t dev         # Deploy to development
+#   databricks bundle deploy -t prod        # Deploy to production
+#   databricks bundle run olist_main_pipeline -t dev  # Run pipeline
+# =============================================================================
+
+bundle:
+  name: olist-lakehouse
+
+# =============================================================================
+# Variables (can be overridden per target)
+# =============================================================================
+variables:
+  catalog:
+    description: "Target Unity Catalog name"
+    default: "olist_dev"
+
+  schema:
+    description: "Target schema within the catalog"
+    default: "default"
+
+# =============================================================================
+# Include pipeline and job definitions
+# =============================================================================
+include:
+  - resources/*.yml
+
+# =============================================================================
+# Deployment Targets
+# =============================================================================
+targets:
+  # ===========================================================================
+  # Development Target
+  # ===========================================================================
+  dev:
+    default: true
+    mode: development
+
+    variables:
+      catalog: "olist_dev"
+      schema: "default"
+
+    # Development-specific permissions
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+
+    # Resource naming for development
+    resources:
+      pipelines:
+        olist_main_pipeline:
+          name: "[DEV] Olist Lakehouse - Main Pipeline"
+          development: true
+
+        olist_cdc_pipeline:
+          name: "[DEV] Olist Lakehouse - CDC Pipeline"
+          development: true
+
+  # ===========================================================================
+  # Staging Target
+  # ===========================================================================
+  staging:
+    mode: development
+
+    variables:
+      catalog: "olist_staging"
+      schema: "default"
+
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+
+    resources:
+      pipelines:
+        olist_main_pipeline:
+          name: "[STAGING] Olist Lakehouse - Main Pipeline"
+          development: false
+
+        olist_cdc_pipeline:
+          name: "[STAGING] Olist Lakehouse - CDC Pipeline"
+          development: false
+
+  # ===========================================================================
+  # Production Target
+  # ===========================================================================
+  prod:
+    mode: production
+
+    workspace:
+      root_path: /Shared/olist-lakehouse
+
+    variables:
+      catalog: "olist"
+      schema: "default"
+
+    # Production permissions - restrict access
+    permissions:
+      - level: CAN_VIEW
+        group_name: users
+      - level: CAN_MANAGE
+        group_name: data-engineers
+
+    # Production-specific resource configurations
+    resources:
+      pipelines:
+        olist_main_pipeline:
+          name: "Olist Lakehouse - Main Pipeline"
+          development: false
+          continuous: false
+
+          # Production clusters with Photon
+          clusters:
+            - label: "default"
+              autoscale:
+                min_workers: 2
+                max_workers: 8
+                mode: "ENHANCED"
+              spark_conf:
+                spark.databricks.photon.enabled: "true"
+
+        olist_cdc_pipeline:
+          name: "Olist Lakehouse - CDC Pipeline"
+          development: false
+          continuous: false
+
+          clusters:
+            - label: "default"
+              autoscale:
+                min_workers: 1
+                max_workers: 4
+                mode: "ENHANCED"
+
+# =============================================================================
+# Sync Configuration
+# =============================================================================
+sync:
+  include:
+    - src/**
+    - resources/**

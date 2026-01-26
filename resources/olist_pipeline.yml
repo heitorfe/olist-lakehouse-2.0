@@ -1,0 +1,110 @@
+# =============================================================================
+# Olist Lakehouse - Lakeflow Pipeline Configuration
+# =============================================================================
+# This configuration defines the Databricks Lakeflow Declarative Pipeline
+# for the Olist E-commerce Lakehouse project.
+#
+# Pipelines:
+#   1. olist_main_pipeline - Main ETL pipeline (Bronze → Silver → Gold)
+#   2. olist_cdc_pipeline - CDC processing pipeline (Customer/Product/Seller changes)
+# =============================================================================
+
+resources:
+  pipelines:
+    # =========================================================================
+    # Main ETL Pipeline
+    # =========================================================================
+    olist_main_pipeline:
+      name: "Olist Lakehouse - Main Pipeline"
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      channel: "CURRENT"
+      edition: "ADVANCED"
+      continuous: false
+
+      configuration:
+        catalog: ${var.catalog}
+
+      libraries:
+        # Bronze Layer - AutoLoader ingestion
+        - file:
+            path: ../src/pipelines/bronze/customers.sql
+        - file:
+            path: ../src/pipelines/bronze/orders.sql
+        - file:
+            path: ../src/pipelines/bronze/order_items.sql
+        - file:
+            path: ../src/pipelines/bronze/order_payments.sql
+        - file:
+            path: ../src/pipelines/bronze/order_reviews.sql
+        - file:
+            path: ../src/pipelines/bronze/products.sql
+        - file:
+            path: ../src/pipelines/bronze/sellers.sql
+        - file:
+            path: ../src/pipelines/bronze/geolocation.sql
+
+        # Silver Layer - Data Quality & Transformation
+        - file:
+            path: ../src/pipelines/silver/customers.sql
+        - file:
+            path: ../src/pipelines/silver/orders.sql
+        - file:
+            path: ../src/pipelines/silver/order_items.sql
+        - file:
+            path: ../src/pipelines/silver/order_payments.sql
+        - file:
+            path: ../src/pipelines/silver/order_reviews.sql
+        - file:
+            path: ../src/pipelines/silver/products.sql
+        - file:
+            path: ../src/pipelines/silver/sellers.sql
+        - file:
+            path: ../src/pipelines/silver/geolocation.sql
+        - file:
+            path: ../src/pipelines/silver/orders_enriched.sql
+
+        # Gold Layer - Business KPIs
+        - file:
+            path: ../src/pipelines/gold/daily_orders.sql
+        - file:
+            path: ../src/pipelines/gold/monthly_orders.sql
+        - file:
+            path: ../src/pipelines/gold/orders_by_state.sql
+        - file:
+            path: ../src/pipelines/gold/seller_performance.sql
+        - file:
+            path: ../src/pipelines/gold/category_performance.sql
+
+    # =========================================================================
+    # CDC Pipeline
+    # =========================================================================
+    olist_cdc_pipeline:
+      name: "Olist Lakehouse - CDC Pipeline"
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      channel: "CURRENT"
+      edition: "ADVANCED"
+      continuous: false
+
+      configuration:
+        catalog: ${var.catalog}
+
+      libraries:
+        # CDC Bronze - Change feed ingestion
+        - file:
+            path: ../src/pipelines/cdc/cdc_customers_bronze.sql
+        - file:
+            path: ../src/pipelines/cdc/cdc_products_bronze.sql
+        - file:
+            path: ../src/pipelines/cdc/cdc_sellers_bronze.sql
+
+        # CDC Silver - AUTO CDC processing (SCD Type 1 & 2)
+        - file:
+            path: ../src/pipelines/cdc/cdc_customers_silver.sql
+        - file:
+            path: ../src/pipelines/cdc/cdc_products_silver.sql
+        - file:
+            path: ../src/pipelines/cdc/cdc_sellers_silver.sql
