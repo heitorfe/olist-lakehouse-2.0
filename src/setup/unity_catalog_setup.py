@@ -198,6 +198,245 @@ for vol in volumes:
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Download Olist Dataset from Kaggle
+# MAGIC
+# MAGIC This section downloads the Brazilian E-commerce dataset from Kaggle and uploads it to the Volume.
+# MAGIC
+# MAGIC ### Prerequisites
+# MAGIC 1. Create a Kaggle account at https://www.kaggle.com
+# MAGIC 2. Generate API credentials at https://www.kaggle.com/settings (Create New Token)
+# MAGIC 3. Store credentials in Databricks Secrets:
+# MAGIC    ```bash
+# MAGIC    databricks secrets create-scope kaggle
+# MAGIC    databricks secrets put-secret kaggle username --string-value "your_username"
+# MAGIC    databricks secrets put-secret kaggle key --string-value "your_api_key"
+# MAGIC    ```
+
+# COMMAND ----------
+
+# Install Kaggle package
+%pip install kaggle --quiet
+
+# COMMAND ----------
+
+import os
+import zipfile
+import shutil
+import tempfile
+
+# Configuration for Kaggle download
+KAGGLE_DATASET = "olistbr/brazilian-ecommerce"
+DOWNLOAD_ENABLED = True  # Set to False to skip download
+
+# Mapping of Kaggle CSV files to Volume directories
+FILE_MAPPING = {
+    "olist_customers_dataset.csv": "customers",
+    "olist_orders_dataset.csv": "orders",
+    "olist_order_items_dataset.csv": "order_items",
+    "olist_order_payments_dataset.csv": "order_payments",
+    "olist_order_reviews_dataset.csv": "order_reviews",
+    "olist_products_dataset.csv": "products",
+    "olist_sellers_dataset.csv": "sellers",
+    "olist_geolocation_dataset.csv": "geolocation",
+    "product_category_name_translation.csv": "reference"  # Extra reference file
+}
+
+# COMMAND ----------
+
+def setup_kaggle_credentials():
+    """
+    Configure Kaggle credentials from Databricks Secrets.
+
+    The credentials are stored in the 'kaggle' secret scope with keys:
+    - 'username': Your Kaggle username
+    - 'key': Your Kaggle API key
+    """
+    try:
+        # Retrieve credentials from Databricks Secrets
+        kaggle_username = dbutils.secrets.get(scope="kaggle", key="username")
+        kaggle_key = dbutils.secrets.get(scope="kaggle", key="key")
+
+        # Set environment variables for Kaggle API
+        os.environ["KAGGLE_USERNAME"] = kaggle_username
+        os.environ["KAGGLE_KEY"] = kaggle_key
+
+        print("✓ Kaggle credentials configured from Databricks Secrets")
+        return True
+    except Exception as e:
+        print(f"⚠ Could not retrieve Kaggle credentials: {str(e)}")
+        print("\nTo configure Kaggle credentials, run these commands in your terminal:")
+        print("  databricks secrets create-scope kaggle")
+        print('  databricks secrets put-secret kaggle username --string-value "your_username"')
+        print('  databricks secrets put-secret kaggle key --string-value "your_api_key"')
+        return False
+
+# COMMAND ----------
+
+def download_kaggle_dataset(dataset_name, download_path):
+    """
+    Download and extract a Kaggle dataset.
+
+    Args:
+        dataset_name: Kaggle dataset identifier (e.g., 'olistbr/brazilian-ecommerce')
+        download_path: Local path to download and extract files
+
+    Returns:
+        List of extracted file paths
+    """
+    from kaggle.api.kaggle_api_extended import KaggleApi
+
+    # Initialize Kaggle API
+    api = KaggleApi()
+    api.authenticate()
+
+    print(f"Downloading dataset: {dataset_name}")
+    print(f"Download path: {download_path}")
+
+    # Download the dataset (comes as a zip file)
+    api.dataset_download_files(
+        dataset=dataset_name,
+        path=download_path,
+        unzip=True
+    )
+
+    # List extracted files
+    extracted_files = []
+    for root, dirs, files in os.walk(download_path):
+        for file in files:
+            if file.endswith('.csv'):
+                extracted_files.append(os.path.join(root, file))
+                print(f"  ✓ Extracted: {file}")
+
+    return extracted_files
+
+# COMMAND ----------
+
+def upload_to_volume(local_path, volume_path, filename):
+    """
+    Upload a local file to a Databricks Volume.
+
+    Args:
+        local_path: Path to the local file
+        volume_path: Volume directory path
+        filename: Target filename in the Volume
+    """
+    # Read the local file and write to Volume
+    target_path = f"{volume_path}/{filename}"
+
+    # Use dbutils to copy the file
+    # First, we need to copy to a DBFS path, then move to Volume
+    dbfs_temp = f"/tmp/kaggle_upload/{filename}"
+
+    # Copy local file to DBFS
+    dbutils.fs.cp(f"file:{local_path}", dbfs_temp)
+
+    # Move from DBFS to Volume
+    dbutils.fs.mv(dbfs_temp, target_path)
+
+    print(f"  ✓ Uploaded to: {target_path}")
+
+# COMMAND ----------
+
+def download_and_upload_olist_dataset():
+    """
+    Main function to download Olist dataset from Kaggle and upload to Volumes.
+    """
+    print("=" * 60)
+    print("DOWNLOADING OLIST DATASET FROM KAGGLE")
+    print("=" * 60)
+
+    # Step 1: Setup credentials
+    if not setup_kaggle_credentials():
+        print("\n⚠ Skipping download - credentials not configured")
+        return False
+
+    # Step 2: Create temp directory for download
+    temp_dir = tempfile.mkdtemp(prefix="olist_kaggle_")
+    print(f"\nTemp directory: {temp_dir}")
+
+    try:
+        # Step 3: Download dataset
+        print("\n--- Downloading Dataset ---")
+        extracted_files = download_kaggle_dataset(KAGGLE_DATASET, temp_dir)
+
+        if not extracted_files:
+            print("⚠ No files were extracted from the dataset")
+            return False
+
+        # Step 4: Create reference directory if needed
+        reference_path = f"{base_path}/reference"
+        dbutils.fs.mkdirs(reference_path)
+
+        # Step 5: Upload files to Volume
+        print("\n--- Uploading to Volumes ---")
+        uploaded_count = 0
+
+        for file_path in extracted_files:
+            filename = os.path.basename(file_path)
+
+            if filename in FILE_MAPPING:
+                target_dir = FILE_MAPPING[filename]
+                volume_dir = f"{base_path}/{target_dir}"
+
+                # Rename to simpler names for consistency
+                target_filename = filename.replace("olist_", "").replace("_dataset", "")
+
+                upload_to_volume(file_path, volume_dir, target_filename)
+                uploaded_count += 1
+            else:
+                print(f"  ⚠ Skipped (unmapped): {filename}")
+
+        print(f"\n✓ Successfully uploaded {uploaded_count} files to Volumes")
+        return True
+
+    except Exception as e:
+        print(f"\n✗ Error during download/upload: {str(e)}")
+        raise
+
+    finally:
+        # Cleanup temp directory
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+            print(f"\n✓ Cleaned up temp directory")
+
+# COMMAND ----------
+
+# Execute download if enabled
+if DOWNLOAD_ENABLED:
+    try:
+        download_and_upload_olist_dataset()
+    except Exception as e:
+        print(f"\n⚠ Download failed: {str(e)}")
+        print("You can manually download the dataset from:")
+        print("  https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce")
+        print(f"  and upload to: {base_path}/")
+else:
+    print("Dataset download is disabled. Set DOWNLOAD_ENABLED = True to enable.")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Verify Downloaded Data
+
+# COMMAND ----------
+
+# List all files in the Volume after download
+print("Files in Volume after Kaggle download:")
+print("=" * 60)
+
+for entity in append_only_entities + ['reference']:
+    try:
+        files = dbutils.fs.ls(f"{base_path}/{entity}/")
+        print(f"\n{entity}/:")
+        for f in files:
+            size_kb = f.size / 1024
+            print(f"  - {f.name} ({size_kb:.1f} KB)")
+    except Exception as e:
+        print(f"\n{entity}/: (empty or not created)")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## Summary
 # MAGIC
 # MAGIC Unity Catalog setup complete! The following objects have been created:
@@ -211,7 +450,22 @@ for vol in volumes:
 # MAGIC | Schema | `gold` | Business-level aggregations |
 # MAGIC | Volume | `raw.olist` | CSV file storage |
 # MAGIC
+# MAGIC ### Kaggle Dataset
+# MAGIC If credentials were configured, the following files were downloaded and uploaded:
+# MAGIC
+# MAGIC | Kaggle File | Volume Directory |
+# MAGIC |-------------|-----------------|
+# MAGIC | `olist_customers_dataset.csv` | `/customers/` |
+# MAGIC | `olist_orders_dataset.csv` | `/orders/` |
+# MAGIC | `olist_order_items_dataset.csv` | `/order_items/` |
+# MAGIC | `olist_order_payments_dataset.csv` | `/order_payments/` |
+# MAGIC | `olist_order_reviews_dataset.csv` | `/order_reviews/` |
+# MAGIC | `olist_products_dataset.csv` | `/products/` |
+# MAGIC | `olist_sellers_dataset.csv` | `/sellers/` |
+# MAGIC | `olist_geolocation_dataset.csv` | `/geolocation/` |
+# MAGIC | `product_category_name_translation.csv` | `/reference/` |
+# MAGIC
 # MAGIC ### Next Steps
-# MAGIC 1. Upload Olist CSV files to `/Volumes/{CATALOG_NAME}/raw/olist/`
+# MAGIC 1. If Kaggle download failed, manually upload CSV files to `/Volumes/{CATALOG_NAME}/raw/olist/`
 # MAGIC 2. Run the data generator for CDC testing
 # MAGIC 3. Deploy and run the Lakeflow pipelines
