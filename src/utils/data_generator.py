@@ -58,6 +58,23 @@ BRAZILIAN_STATES = {
     'DF': 'Brasilia', 'GO': 'Goiania', 'PA': 'Belem'
 }
 
+# Brazilian names for PII generation
+BRAZILIAN_FIRST_NAMES = [
+    'Joao', 'Maria', 'Carlos', 'Ana', 'Paulo', 'Fernanda',
+    'Pedro', 'Julia', 'Lucas', 'Beatriz', 'Gabriel', 'Leticia',
+    'Rafael', 'Camila', 'Bruno', 'Amanda', 'Felipe', 'Larissa',
+    'Matheus', 'Isabela', 'Gustavo', 'Mariana', 'Rodrigo', 'Patricia'
+]
+
+BRAZILIAN_LAST_NAMES = [
+    'Silva', 'Santos', 'Oliveira', 'Souza', 'Rodrigues',
+    'Ferreira', 'Alves', 'Pereira', 'Lima', 'Gomes',
+    'Costa', 'Ribeiro', 'Martins', 'Carvalho', 'Almeida',
+    'Lopes', 'Soares', 'Fernandes', 'Vieira', 'Barbosa'
+]
+
+EMAIL_DOMAINS = ['gmail.com', 'hotmail.com', 'yahoo.com.br', 'outlook.com', 'uol.com.br']
+
 PRODUCT_CATEGORIES = [
     'electronics', 'computers', 'home appliances', 'furniture', 'sports',
     'toys', 'health beauty', 'fashion bags', 'watches gifts', 'garden tools',
@@ -88,6 +105,37 @@ def random_timestamp(start_date, end_date):
     random_seconds = random.randint(0, 86400)
     return start_date + timedelta(days=random_days, seconds=random_seconds)
 
+
+def generate_brazilian_name():
+    """Generate a random Brazilian full name."""
+    first_name = random.choice(BRAZILIAN_FIRST_NAMES)
+    last_name = random.choice(BRAZILIAN_LAST_NAMES)
+    return first_name, last_name
+
+
+def generate_email(first_name, last_name):
+    """Generate a realistic email address based on name."""
+    domain = random.choice(EMAIL_DOMAINS)
+    # Various email patterns
+    patterns = [
+        f"{first_name.lower()}.{last_name.lower()}",
+        f"{first_name.lower()}{last_name.lower()}",
+        f"{first_name.lower()}.{last_name.lower()}{random.randint(10, 99)}",
+        f"{first_name.lower()}_{last_name.lower()}",
+        f"{first_name.lower()[0]}{last_name.lower()}"
+    ]
+    local_part = random.choice(patterns)
+    return f"{local_part}@{domain}"
+
+
+def generate_phone():
+    """Generate a Brazilian mobile phone number."""
+    # Brazilian phone format: +55 (DD) 9XXXX-XXXX
+    ddd = random.randint(11, 99)  # Brazilian area codes
+    first_part = random.randint(1000, 9999)
+    second_part = random.randint(1000, 9999)
+    return f"+55 ({ddd}) 9{first_part}-{second_part}"
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -96,16 +144,21 @@ def random_timestamp(start_date, end_date):
 # COMMAND ----------
 
 def generate_customers(count):
-    """Generate initial customer data."""
+    """Generate initial customer data with PII fields."""
     customers = []
     for _ in range(count):
         state, city, zip_prefix = random_brazilian_location()
+        first_name, last_name = generate_brazilian_name()
         customers.append({
             'customer_id': generate_uuid(),
             'customer_unique_id': generate_uuid(),
             'customer_zip_code_prefix': zip_prefix,
             'customer_city': city,
-            'customer_state': state
+            'customer_state': state,
+            # PII fields for Unity Catalog masking demonstration
+            'customer_name': f"{first_name} {last_name}",
+            'customer_email': generate_email(first_name, last_name),
+            'customer_phone': generate_phone()
         })
     return customers
 
@@ -265,12 +318,16 @@ def generate_cdc_batch(existing_records, entity_type, batch_num, changes_count):
             operation = 'INSERT'
             if entity_type == 'customers':
                 state, city, zip_prefix = random_brazilian_location()
+                first_name, last_name = generate_brazilian_name()
                 record = {
                     'customer_id': generate_uuid(),
                     'customer_unique_id': generate_uuid(),
                     'customer_zip_code_prefix': zip_prefix,
                     'customer_city': city,
-                    'customer_state': state
+                    'customer_state': state,
+                    'customer_name': f"{first_name} {last_name}",
+                    'customer_email': generate_email(first_name, last_name),
+                    'customer_phone': generate_phone()
                 }
             elif entity_type == 'products':
                 record = {
@@ -308,6 +365,12 @@ def generate_cdc_batch(existing_records, entity_type, batch_num, changes_count):
                 record['customer_city'] = city
                 record['customer_state'] = state
                 record['customer_zip_code_prefix'] = zip_prefix
+                # Occasionally update email or phone (simulating contact info changes)
+                if random.random() < 0.3:
+                    first_name, last_name = generate_brazilian_name()
+                    record['customer_email'] = generate_email(first_name, last_name)
+                if random.random() < 0.2:
+                    record['customer_phone'] = generate_phone()
             elif entity_type == 'products':
                 record['product_category_name'] = random.choice(PRODUCT_CATEGORIES)
                 record['product_weight_g'] = random.randint(100, 50000)
