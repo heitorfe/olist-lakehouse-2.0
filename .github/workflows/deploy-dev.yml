@@ -50,10 +50,7 @@ jobs:
           key: ${{ runner.os }}-pip-lint-${{ hashFiles('requirements-dev.txt') }}
 
       - name: Install linting tools
-        run: pip install sqlfluff==3.0.7 ruff yamllint
-
-      - name: Run SQLFluff
-        run: sqlfluff lint src/pipelines/ --dialect databricks
+        run: pip install ruff yamllint
 
       - name: Run Ruff
         run: ruff check src/

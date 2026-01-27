@@ -25,43 +25,6 @@ env:
 
 jobs:
   # ============================================================================
-  # SQL Linting with SQLFluff
-  # ============================================================================
-  # Note: SQLFluff's databricks dialect doesn't fully support Lakeflow-specific
-  # syntax (read_files(), STREAMING TABLE, MATERIALIZED VIEW, etc.). Parsing
-  # errors (PRS) are expected and allowed. Only style/lint violations fail.
-  sql-lint:
-    name: SQL Lint (SQLFluff)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-sqlfluff-${{ hashFiles('requirements-dev.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-sqlfluff-
-
-      - name: Install SQLFluff
-        run: pip install sqlfluff==3.0.7
-
-      - name: Run SQLFluff Lint
-        run: |
-          # SQLFluff with rules=None only reports parsing issues
-          # Lakeflow syntax causes unavoidable parsing errors, so we just verify
-          # the SQL files exist and SQLFluff can attempt to parse them
-          sqlfluff lint src/pipelines/ --dialect databricks || true
-          echo "SQLFluff check complete (parsing warnings for Lakeflow syntax are expected)"
-
-  # ============================================================================
   # Python Linting with Ruff (Auto-fix enabled)
   # ============================================================================
   python-lint:
@@ -193,13 +156,12 @@ jobs:
   pr-validation-summary:
     name: PR Validation Summary
     runs-on: ubuntu-latest
-    needs: [sql-lint, python-lint, yaml-validation, bundle-validation, security-scan, unit-tests]
+    needs: [python-lint, yaml-validation, bundle-validation, security-scan, unit-tests]
     if: always()
     steps:
       - name: Check all jobs passed
         run: |
-          if [[ "${{ needs.sql-lint.result }}" == "failure" || \
-                "${{ needs.python-lint.result }}" == "failure" || \
+          if [[ "${{ needs.python-lint.result }}" == "failure" || \
                 "${{ needs.yaml-validation.result }}" == "failure" || \
                 "${{ needs.bundle-validation.result }}" == "failure" || \
                 "${{ needs.security-scan.result }}" == "failure" || \
