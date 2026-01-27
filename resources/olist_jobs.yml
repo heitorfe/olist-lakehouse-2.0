@@ -1,0 +1,161 @@
+# =============================================================================
+# Olist Lakehouse - Lakeflow Jobs Configuration
+# =============================================================================
+# This configuration defines Databricks Jobs for orchestrating the daily
+# ETL workflow including data generation and pipeline execution.
+#
+# Jobs:
+#   1. olist_daily_job - Daily orchestration (data gen + pipelines)
+#   2. olist_weekly_refresh_job - Weekly full refresh (optional)
+#
+# Workflow:
+#   generate_data --> run_main_pipeline (parallel)
+#                 --> run_cdc_pipeline  (parallel)
+# =============================================================================
+
+resources:
+  jobs:
+    # =========================================================================
+    # Daily Orchestration Job
+    # =========================================================================
+    olist_daily_job:
+      name: "Olist Lakehouse - Daily Orchestration"
+      description: |
+        Daily orchestration job for the Olist Lakehouse project.
+
+        Workflow:
+        1. Generates synthetic CDC and transactional data
+        2. Runs the main ETL pipeline (Bronze -> Silver -> Gold)
+        3. Processes CDC changes with SCD Type 1 and Type 2
+
+        Schedule: Daily at 06:00 UTC
+
+      # -----------------------------------------------------------------------
+      # Schedule Configuration
+      # -----------------------------------------------------------------------
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: "UTC"
+        pause_status: "UNPAUSED"
+
+      # -----------------------------------------------------------------------
+      # Job Settings
+      # -----------------------------------------------------------------------
+      max_concurrent_runs: 1
+      timeout_seconds: 10800
+
+      # -----------------------------------------------------------------------
+      # Email Notifications
+      # -----------------------------------------------------------------------
+      email_notifications:
+        on_failure:
+          - "data-engineering@example.com"
+        no_alert_for_skipped_runs: true
+
+      # -----------------------------------------------------------------------
+      # Queue Configuration
+      # -----------------------------------------------------------------------
+      queue:
+        enabled: true
+
+      # -----------------------------------------------------------------------
+      # Task Definitions
+      # -----------------------------------------------------------------------
+      tasks:
+        # ---------------------------------------------------------------------
+        # Task 1: Generate Synthetic Data
+        # ---------------------------------------------------------------------
+        - task_key: "generate_data"
+          description: "Generate synthetic CDC and initial load data"
+
+          notebook_task:
+            notebook_path: "../src/utils/data_generator.py"
+            source: "WORKSPACE"
+            base_parameters:
+              catalog: "${var.catalog}"
+
+          timeout_seconds: 3600
+
+          # Retry configuration
+          retry_on_timeout: false
+          max_retries: 1
+          min_retry_interval_millis: 60000
+
+        # ---------------------------------------------------------------------
+        # Task 2: Run Main ETL Pipeline
+        # ---------------------------------------------------------------------
+        - task_key: "run_main_pipeline"
+          description: "Execute Bronze -> Silver -> Gold ETL pipeline"
+
+          depends_on:
+            - task_key: "generate_data"
+
+          pipeline_task:
+            pipeline_id: "${resources.pipelines.olist_main_pipeline.id}"
+            full_refresh: false
+
+          timeout_seconds: 5400
+
+        # ---------------------------------------------------------------------
+        # Task 3: Run CDC Pipeline
+        # ---------------------------------------------------------------------
+        - task_key: "run_cdc_pipeline"
+          description: "Process CDC changes with SCD Type 1 and Type 2"
+
+          depends_on:
+            - task_key: "generate_data"
+
+          pipeline_task:
+            pipeline_id: "${resources.pipelines.olist_cdc_pipeline.id}"
+            full_refresh: false
+
+          timeout_seconds: 3600
+
+    # =========================================================================
+    # Weekly Full Refresh Job (Optional)
+    # =========================================================================
+    olist_weekly_refresh_job:
+      name: "Olist Lakehouse - Weekly Full Refresh"
+      description: |
+        Weekly full refresh job for the Olist Lakehouse project.
+        Performs a complete refresh of all pipeline tables.
+
+        Schedule: Every Sunday at 02:00 UTC (paused by default)
+
+      schedule:
+        quartz_cron_expression: "0 0 2 ? * SUN"
+        timezone_id: "UTC"
+        pause_status: "PAUSED"
+
+      max_concurrent_runs: 1
+      timeout_seconds: 21600
+
+      email_notifications:
+        on_failure:
+          - "data-engineering@example.com"
+        no_alert_for_skipped_runs: true
+
+      queue:
+        enabled: true
+
+      tasks:
+        - task_key: "full_refresh_main_pipeline"
+          description: "Full refresh of main ETL pipeline"
+
+          pipeline_task:
+            pipeline_id: "${resources.pipelines.olist_main_pipeline.id}"
+            full_refresh: true
+
+          timeout_seconds: 14400
+
+        - task_key: "full_refresh_cdc_pipeline"
+          description: "Full refresh of CDC pipeline"
+
+          depends_on:
+            - task_key: "full_refresh_main_pipeline"
+
+          pipeline_task:
+            pipeline_id: "${resources.pipelines.olist_cdc_pipeline.id}"
+            full_refresh: true
+
+          timeout_seconds: 7200

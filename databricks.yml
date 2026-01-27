@@ -63,6 +63,25 @@ targets:
           name: "[DEV] Olist Lakehouse - CDC Pipeline"
           development: true
 
+      jobs:
+        olist_daily_job:
+          name: "[DEV] Olist Lakehouse - Daily Orchestration"
+          schedule:
+            quartz_cron_expression: "0 0 6 * * ?"
+            timezone_id: "UTC"
+            pause_status: "PAUSED"
+          email_notifications:
+            on_failure: []
+
+        olist_weekly_refresh_job:
+          name: "[DEV] Olist Lakehouse - Weekly Full Refresh"
+          schedule:
+            quartz_cron_expression: "0 0 2 ? * SUN"
+            timezone_id: "UTC"
+            pause_status: "PAUSED"
+          email_notifications:
+            on_failure: []
+
   # ===========================================================================
   # Staging Target
   # ===========================================================================
@@ -86,6 +105,21 @@ targets:
         olist_cdc_pipeline:
           name: "[STAGING] Olist Lakehouse - CDC Pipeline"
           development: false
+
+      jobs:
+        olist_daily_job:
+          name: "[STAGING] Olist Lakehouse - Daily Orchestration"
+          schedule:
+            quartz_cron_expression: "0 0 7 * * ?"
+            timezone_id: "UTC"
+            pause_status: "UNPAUSED"
+
+        olist_weekly_refresh_job:
+          name: "[STAGING] Olist Lakehouse - Weekly Full Refresh"
+          schedule:
+            quartz_cron_expression: "0 0 2 ? * SUN"
+            timezone_id: "UTC"
+            pause_status: "PAUSED"
 
   # ===========================================================================
   # Production Target
@@ -136,6 +170,29 @@ targets:
                 min_workers: 1
                 max_workers: 4
                 mode: "ENHANCED"
+
+      jobs:
+        olist_daily_job:
+          name: "Olist Lakehouse - Daily Orchestration"
+          schedule:
+            quartz_cron_expression: "0 0 6 * * ?"
+            timezone_id: "UTC"
+            pause_status: "UNPAUSED"
+          timeout_seconds: 14400
+          email_notifications:
+            on_failure:
+              - "data-engineering@example.com"
+
+        olist_weekly_refresh_job:
+          name: "Olist Lakehouse - Weekly Full Refresh"
+          schedule:
+            quartz_cron_expression: "0 0 2 ? * SUN"
+            timezone_id: "UTC"
+            pause_status: "UNPAUSED"
+          timeout_seconds: 28800
+          email_notifications:
+            on_failure:
+              - "data-engineering@example.com"
 
 # =============================================================================
 # Sync Configuration
