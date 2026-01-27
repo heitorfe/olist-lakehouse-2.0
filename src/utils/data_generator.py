@@ -27,7 +27,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import *
 
 # Configuration
-CATALOG = spark.conf.get("catalog", "olist_dev")
+CATALOG = dbutils.widgets.get("catalog", "olist_dev")
 VOLUME_PATH = f"/Volumes/{CATALOG}/raw/olist"
 
 # Data generation settings
