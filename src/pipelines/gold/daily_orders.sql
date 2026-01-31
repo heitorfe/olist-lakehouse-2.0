@@ -6,7 +6,7 @@
 -- Grain: One row per day
 -- =============================================================================
 
-CREATE OR REFRESH MATERIALIZED VIEW gold_daily_orders (
+CREATE OR REFRESH MATERIALIZED VIEW ${catalog}.gold.gold_daily_orders (
     -- Quality gate: Ensure revenue is non-negative
     CONSTRAINT positive_revenue
         EXPECT (total_revenue >= 0)
@@ -60,7 +60,7 @@ AS SELECT
 
     current_timestamp() AS _refreshed_at
 
-FROM silver_orders_enriched
+FROM ${catalog}.silver.silver_orders_enriched
 WHERE order_date IS NOT NULL
 GROUP BY order_date
 ORDER BY order_date DESC;

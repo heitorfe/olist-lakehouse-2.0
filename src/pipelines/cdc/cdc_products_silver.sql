@@ -9,7 +9,7 @@
 -- =============================================================================
 -- Staging: Validated CDC Events
 -- =============================================================================
-CREATE OR REFRESH STREAMING TABLE stg_cdc_products (
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.stg_cdc_products (
     CONSTRAINT valid_product_id
         EXPECT (product_id IS NOT NULL AND LENGTH(TRIM(product_id)) = 32)
         ON VIOLATION DROP ROW,
@@ -36,13 +36,13 @@ AS SELECT
     CAST(product_height_cm AS DECIMAL(10, 2)) AS product_height_cm,
     CAST(product_width_cm AS DECIMAL(10, 2)) AS product_width_cm,
     _ingested_at
-FROM STREAM(bronze_cdc_products);
+FROM STREAM(${catalog}.bronze.bronze_cdc_products);
 
 -- =============================================================================
 -- SCD Type 1: Current Product State
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE silver_products_current
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_products_current
 COMMENT 'Current state of products (SCD Type 1) - Updated via AUTO CDC'
 TBLPROPERTIES (
     'quality' = 'silver',
@@ -50,8 +50,8 @@ TBLPROPERTIES (
 );
 
 CREATE FLOW products_current_flow
-AS AUTO CDC INTO silver_products_current
-FROM stream(stg_cdc_products)
+AS AUTO CDC INTO ${catalog}.silver.silver_products_current
+FROM stream(${catalog}.silver.stg_cdc_products)
 KEYS (product_id)
 APPLY AS DELETE WHEN operation = 'DELETE'
 SEQUENCE BY sequence_number
@@ -62,7 +62,7 @@ STORED AS SCD TYPE 1;
 -- SCD Type 2: Product History
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE silver_products_history
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_products_history
 COMMENT 'Historical product changes (SCD Type 2) - Full audit trail via AUTO CDC'
 TBLPROPERTIES (
     'quality' = 'silver',
@@ -70,8 +70,8 @@ TBLPROPERTIES (
 );
 
 CREATE FLOW products_history_flow
-AS AUTO CDC INTO silver_products_history
-FROM stream(stg_cdc_products)
+AS AUTO CDC INTO ${catalog}.silver.silver_products_history
+FROM stream(${catalog}.silver.stg_cdc_products)
 KEYS (product_id)
 APPLY AS DELETE WHEN operation = 'DELETE'
 SEQUENCE BY sequence_number

@@ -6,7 +6,7 @@
 -- Pattern: Streaming table - order items are immutable
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE bronze_order_items
+CREATE OR REFRESH STREAMING TABLE ${catalog}.bronze.bronze_order_items
 COMMENT 'Raw order item data ingested from CSV files via Auto Loader'
 TBLPROPERTIES (
     'quality' = 'bronze',

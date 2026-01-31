@@ -6,7 +6,7 @@
 -- Pattern: Materialized view for aggregated reference data
 -- =============================================================================
 
-CREATE OR REFRESH MATERIALIZED VIEW silver_geolocation
+CREATE OR REFRESH MATERIALIZED VIEW ${catalog}.silver.silver_geolocation
 COMMENT 'Cleansed and deduplicated geolocation reference data with averaged coordinates'
 TBLPROPERTIES (
     'quality' = 'silver'
@@ -20,7 +20,7 @@ WITH deduplicated AS (
         AVG(CAST(geolocation_lat AS DOUBLE)) AS latitude,
         AVG(CAST(geolocation_lng AS DOUBLE)) AS longitude,
         COUNT(*) AS sample_count
-    FROM bronze_geolocation
+    FROM ${catalog}.bronze.bronze_geolocation
     WHERE geolocation_zip_code_prefix IS NOT NULL
         AND geolocation_lat IS NOT NULL
         AND geolocation_lng IS NOT NULL

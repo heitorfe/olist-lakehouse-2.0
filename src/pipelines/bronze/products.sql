@@ -6,7 +6,7 @@
 -- Note: Initial product load - CDC updates handled separately
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE bronze_products
+CREATE OR REFRESH STREAMING TABLE ${catalog}.bronze.bronze_products
 COMMENT 'Raw product data ingested from CSV files via Auto Loader'
 TBLPROPERTIES (
     'quality' = 'bronze',

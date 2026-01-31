@@ -7,7 +7,7 @@
 -- PII Fields: customer_name, customer_email, customer_phone (for masking demo)
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE silver_customers (
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_customers (
     -- Data Quality Constraints (DROP invalid rows)
     CONSTRAINT valid_customer_id
         EXPECT (customer_id IS NOT NULL AND LENGTH(TRIM(customer_id)) = 32)
@@ -44,4 +44,4 @@ AS SELECT
     _file_modified_at,
     _ingested_at,
     current_timestamp() AS _processed_at
-FROM STREAM(bronze_customers);
+FROM STREAM(${catalog}.bronze.bronze_customers);

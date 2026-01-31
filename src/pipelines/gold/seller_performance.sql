@@ -6,7 +6,7 @@
 -- Grain: One row per seller per day
 -- =============================================================================
 
-CREATE OR REFRESH MATERIALIZED VIEW gold_seller_performance (
+CREATE OR REFRESH MATERIALIZED VIEW ${catalog}.gold.gold_seller_performance (
     CONSTRAINT positive_gmv
         EXPECT (gmv >= 0)
         ON VIOLATION FAIL UPDATE
@@ -44,10 +44,10 @@ AS SELECT
 
     current_timestamp() AS _refreshed_at
 
-FROM silver_order_items oi
-INNER JOIN silver_orders o ON oi.order_id = o.order_id
-INNER JOIN silver_sellers s ON oi.seller_id = s.seller_id
-LEFT JOIN silver_order_reviews r ON oi.order_id = r.order_id
+FROM ${catalog}.silver.silver_order_items oi
+INNER JOIN ${catalog}.silver.silver_orders o ON oi.order_id = o.order_id
+INNER JOIN ${catalog}.silver.silver_sellers s ON oi.seller_id = s.seller_id
+LEFT JOIN ${catalog}.silver.silver_order_reviews r ON oi.order_id = r.order_id
 WHERE DATE(o.order_purchase_timestamp) IS NOT NULL
 GROUP BY
     DATE(o.order_purchase_timestamp),

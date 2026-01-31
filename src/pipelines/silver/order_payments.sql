@@ -6,7 +6,7 @@
 -- Data Quality: DROP rows with invalid IDs or negative values
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE silver_order_payments (
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_order_payments (
     -- Data Quality Constraints (DROP invalid rows)
     CONSTRAINT valid_order_id
         EXPECT (order_id IS NOT NULL AND LENGTH(TRIM(order_id)) = 32)
@@ -53,4 +53,4 @@ AS SELECT
     _file_modified_at,
     _ingested_at,
     current_timestamp() AS _processed_at
-FROM STREAM(bronze_order_payments);
+FROM STREAM(${catalog}.bronze.bronze_order_payments);

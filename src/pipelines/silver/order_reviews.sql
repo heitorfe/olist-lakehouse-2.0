@@ -6,7 +6,7 @@
 -- Data Quality: DROP rows with invalid IDs or out-of-range scores
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE silver_order_reviews (
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_order_reviews (
     -- Data Quality Constraints (DROP invalid rows)
     CONSTRAINT valid_review_id
         EXPECT (review_id IS NOT NULL AND LENGTH(TRIM(review_id)) = 32)
@@ -59,4 +59,4 @@ AS SELECT
     _file_modified_at,
     _ingested_at,
     current_timestamp() AS _processed_at
-FROM STREAM(bronze_order_reviews);
+FROM STREAM(${catalog}.bronze.bronze_order_reviews);

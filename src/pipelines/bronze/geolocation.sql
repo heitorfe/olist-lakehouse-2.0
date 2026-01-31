@@ -6,7 +6,7 @@
 -- Pattern: Reference/dimension table for geographic lookups
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE bronze_geolocation
+CREATE OR REFRESH STREAMING TABLE ${catalog}.bronze.bronze_geolocation
 COMMENT 'Raw geolocation reference data ingested from CSV files via Auto Loader'
 TBLPROPERTIES (
     'quality' = 'bronze',

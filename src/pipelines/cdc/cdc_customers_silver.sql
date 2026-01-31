@@ -9,7 +9,7 @@
 -- =============================================================================
 -- Staging: Validated CDC Events
 -- =============================================================================
-CREATE OR REFRESH STREAMING TABLE stg_cdc_customers (
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.stg_cdc_customers (
     CONSTRAINT valid_customer_id
         EXPECT (customer_id IS NOT NULL AND LENGTH(TRIM(customer_id)) = 32)
         ON VIOLATION DROP ROW,
@@ -32,7 +32,7 @@ AS SELECT
     INITCAP(TRIM(customer_city)) AS customer_city,
     UPPER(TRIM(customer_state)) AS customer_state,
     _ingested_at
-FROM STREAM(bronze_cdc_customers);
+FROM STREAM(${catalog}.bronze.bronze_cdc_customers);
 
 -- =============================================================================
 -- SCD Type 1: Current Customer State
@@ -41,7 +41,7 @@ FROM STREAM(bronze_cdc_customers);
 -- Useful for: Current lookups, joins with fact tables
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE silver_customers_current
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_customers_current
 COMMENT 'Current state of customers (SCD Type 1) - Updated via AUTO CDC'
 TBLPROPERTIES (
     'quality' = 'silver',
@@ -49,8 +49,8 @@ TBLPROPERTIES (
 );
 
 CREATE FLOW customers_current_flow
-AS AUTO CDC INTO silver_customers_current
-FROM stream(stg_cdc_customers)
+AS AUTO CDC INTO ${catalog}.silver.silver_customers_current
+FROM stream(${catalog}.silver.stg_cdc_customers)
 KEYS (customer_id)
 APPLY AS DELETE WHEN operation = 'DELETE'
 SEQUENCE BY sequence_number
@@ -65,7 +65,7 @@ STORED AS SCD TYPE 1;
 -- Generated columns: __START_AT, __END_AT, __IS_CURRENT
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE silver_customers_history
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_customers_history
 COMMENT 'Historical customer changes (SCD Type 2) - Full audit trail via AUTO CDC'
 TBLPROPERTIES (
     'quality' = 'silver',
@@ -73,8 +73,8 @@ TBLPROPERTIES (
 );
 
 CREATE FLOW customers_history_flow
-AS AUTO CDC INTO silver_customers_history
-FROM stream(stg_cdc_customers)
+AS AUTO CDC INTO ${catalog}.silver.silver_customers_history
+FROM stream(${catalog}.silver.stg_cdc_customers)
 KEYS (customer_id)
 APPLY AS DELETE WHEN operation = 'DELETE'
 SEQUENCE BY sequence_number

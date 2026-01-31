@@ -6,7 +6,7 @@
 -- Data Quality: DROP rows with invalid product_id
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE silver_products (
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_products (
     -- Data Quality Constraints (DROP invalid rows)
     CONSTRAINT valid_product_id
         EXPECT (product_id IS NOT NULL AND LENGTH(TRIM(product_id)) = 32)
@@ -77,4 +77,4 @@ AS SELECT
     _file_modified_at,
     _ingested_at,
     current_timestamp() AS _processed_at
-FROM STREAM(bronze_products);
+FROM STREAM(${catalog}.bronze.bronze_products);
