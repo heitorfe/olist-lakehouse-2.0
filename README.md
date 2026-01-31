@@ -10,6 +10,7 @@ This project implements a complete data lakehouse solution for the [Olist Brazil
 - **AUTO CDC** (Change Data Capture) with SCD Type 1 and Type 2
 - **Data Quality** with expectations at each layer
 - **Unity Catalog** for governance and lineage
+- **PII Masking** with column masks and row filters
 - **Databricks Asset Bundles** for CI/CD deployment
 
 ## Architecture
@@ -105,16 +106,20 @@ olist-lakehouse-2.0/
 │   │   │   ├── seller_performance.sql
 │   │   │   └── category_performance.sql
 │   │   │
-│   │   └── cdc/                # CDC processing (6 files)
-│   │       ├── cdc_customers_bronze.sql
-│   │       ├── cdc_customers_silver.sql
-│   │       ├── cdc_products_bronze.sql
-│   │       ├── cdc_products_silver.sql
-│   │       ├── cdc_sellers_bronze.sql
-│   │       └── cdc_sellers_silver.sql
+│   │   ├── cdc/                # CDC processing (6 files)
+│   │   │   ├── cdc_customers_bronze.sql
+│   │   │   ├── cdc_customers_silver.sql
+│   │   │   ├── cdc_products_bronze.sql
+│   │   │   ├── cdc_products_silver.sql
+│   │   │   ├── cdc_sellers_bronze.sql
+│   │   │   └── cdc_sellers_silver.sql
+│   │   │
+│   │   └── security/           # PII masking (2 files)
+│   │       ├── pii_masking.sql     # Column mask & row filter functions
+│   │       └── apply_masks.sql     # Apply masks to tables
 │   │
 │   └── utils/
-│       └── data_generator.py   # Synthetic data generator
+│       └── data_generator.py   # Synthetic data generator (with PII)
 │
 ├── resources/
 │   └── olist_pipeline.yml      # Pipeline definitions
@@ -188,6 +193,26 @@ AS SELECT ...
 - **Orders by State**: Geographic distribution and regional performance
 - **Seller Performance**: GMV, ratings, and customer reach by seller
 - **Category Performance**: Product category trends and rankings
+
+### 5. PII Masking (Unity Catalog)
+
+```sql
+-- Column masks protect sensitive data based on user groups
+CREATE OR REPLACE FUNCTION mask_customer_email(email STRING)
+RETURNS STRING
+RETURN CASE
+    WHEN IS_ACCOUNT_GROUP_MEMBER('pii-readers') THEN email
+    ELSE CONCAT(SUBSTRING(email, 1, 2), '****@', SUBSTRING_INDEX(email, '@', -1))
+END;
+
+-- Row filters restrict access by region
+ALTER TABLE silver_customers
+SET ROW FILTER filter_by_region ON (customer_state);
+```
+
+- **Column Masks**: Protect PII fields (name, email, phone) based on group membership
+- **Row Filters**: Restrict data access by Brazilian region
+- **Transparent Security**: Masking applied automatically at query time
 
 ## Deployment
 
@@ -288,6 +313,7 @@ CDC CSV Files → AutoLoader → Bronze CDC → Staging → SCD Type 1 (Current)
 
 - ✅ Serverless pipelines for cost optimization
 - ✅ Unity Catalog for data governance
+- ✅ PII masking with column masks and row filters
 - ✅ Parameterized configurations for environment flexibility
 - ✅ Data quality expectations at each layer
 - ✅ SCD Type 1 and Type 2 for historical tracking

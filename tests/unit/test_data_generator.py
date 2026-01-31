@@ -7,14 +7,58 @@ without requiring a Spark session or Databricks environment.
 
 import random
 import uuid
+import re
 
 # ============================================================================
 # Helper functions (patterns from data_generator.py)
 # ============================================================================
 
+# Brazilian names for PII generation
+BRAZILIAN_FIRST_NAMES = [
+    'Joao', 'Maria', 'Carlos', 'Ana', 'Paulo', 'Fernanda',
+    'Pedro', 'Julia', 'Lucas', 'Beatriz', 'Gabriel', 'Leticia'
+]
+
+BRAZILIAN_LAST_NAMES = [
+    'Silva', 'Santos', 'Oliveira', 'Souza', 'Rodrigues',
+    'Ferreira', 'Alves', 'Pereira', 'Lima', 'Gomes'
+]
+
+EMAIL_DOMAINS = ['gmail.com', 'hotmail.com', 'yahoo.com.br', 'outlook.com', 'uol.com.br']
+
+
 def generate_uuid():
     """Generate a 32-character UUID without hyphens."""
     return uuid.uuid4().hex
+
+
+def generate_brazilian_name():
+    """Generate a random Brazilian full name."""
+    first_name = random.choice(BRAZILIAN_FIRST_NAMES)
+    last_name = random.choice(BRAZILIAN_LAST_NAMES)
+    return first_name, last_name
+
+
+def generate_email(first_name, last_name):
+    """Generate a realistic email address based on name."""
+    domain = random.choice(EMAIL_DOMAINS)
+    patterns = [
+        f"{first_name.lower()}.{last_name.lower()}",
+        f"{first_name.lower()}{last_name.lower()}",
+        f"{first_name.lower()}.{last_name.lower()}{random.randint(10, 99)}",
+        f"{first_name.lower()}_{last_name.lower()}",
+        f"{first_name.lower()[0]}{last_name.lower()}"
+    ]
+    local_part = random.choice(patterns)
+    return f"{local_part}@{domain}"
+
+
+def generate_phone():
+    """Generate a Brazilian mobile phone number."""
+    ddd = random.randint(11, 99)
+    first_part = random.randint(1000, 9999)
+    second_part = random.randint(1000, 9999)
+    return f"+55 ({ddd}) 9{first_part}-{second_part}"
 
 
 def random_brazilian_location():
