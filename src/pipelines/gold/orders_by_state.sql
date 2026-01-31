@@ -2,7 +2,7 @@
 -- Gold Layer: Orders by Customer State
 -- =============================================================================
 -- Description: Geographic distribution of orders by customer state
--- Sources: silver_orders_enriched, silver_customers
+-- Sources: silver_orders, silver_order_items, silver_customers, silver_order_reviews
 -- Grain: One row per state per day
 -- =============================================================================
 
@@ -16,8 +16,16 @@ TBLPROPERTIES (
     'quality' = 'gold'
 )
 CLUSTER BY AUTO
-AS SELECT
-    o.order_date,
+AS
+WITH order_totals AS (
+    SELECT
+        order_id,
+        SUM(total_item_value) AS total_order_value
+    FROM ${catalog}.silver.silver_order_items
+    GROUP BY order_id
+)
+SELECT
+    DATE(o.order_purchase_timestamp) AS order_date,
     c.customer_state,
     CASE c.customer_state
         WHEN 'SP' THEN 'Southeast'
@@ -45,25 +53,33 @@ AS SELECT
 
     -- Volume metrics
     COUNT(*) AS total_orders,
-    COUNT(CASE WHEN o.is_delivered THEN 1 END) AS delivered_orders,
+    COUNT(CASE WHEN o.order_status = 'delivered' THEN 1 END) AS delivered_orders,
 
     -- Revenue metrics
-    SUM(o.total_order_value) AS total_revenue,
-    AVG(o.total_order_value) AS avg_order_value,
+    SUM(COALESCE(ot.total_order_value, 0)) AS total_revenue,
+    AVG(COALESCE(ot.total_order_value, 0)) AS avg_order_value,
 
     -- Customer metrics
     COUNT(DISTINCT o.customer_id) AS unique_customers,
 
     -- Review metrics
-    AVG(o.review_score) AS avg_review_score,
+    AVG(r.review_score) AS avg_review_score,
 
     -- Delivery metrics
-    AVG(o.delivery_days) AS avg_delivery_days,
+    AVG(
+        CASE
+            WHEN o.order_delivered_customer_date IS NOT NULL
+            THEN DATEDIFF(o.order_delivered_customer_date, o.order_purchase_timestamp)
+            ELSE NULL
+        END
+    ) AS avg_delivery_days,
 
     current_timestamp() AS _refreshed_at
 
-FROM ${catalog}.silver.silver_orders_enriched o
+FROM ${catalog}.silver.silver_orders o
 INNER JOIN ${catalog}.silver.silver_customers c ON o.customer_id = c.customer_id
-WHERE o.order_date IS NOT NULL
-GROUP BY o.order_date, c.customer_state
-ORDER BY o.order_date DESC, total_revenue DESC;
+LEFT JOIN order_totals ot ON o.order_id = ot.order_id
+LEFT JOIN ${catalog}.silver.silver_order_reviews r ON o.order_id = r.order_id
+WHERE DATE(o.order_purchase_timestamp) IS NOT NULL
+GROUP BY DATE(o.order_purchase_timestamp), c.customer_state
+ORDER BY order_date DESC, total_revenue DESC;
