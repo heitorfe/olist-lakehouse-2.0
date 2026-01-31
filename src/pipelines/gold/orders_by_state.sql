@@ -6,7 +6,7 @@
 -- Grain: One row per state per day
 -- =============================================================================
 
-CREATE OR REFRESH MATERIALIZED VIEW gold_orders_by_state (
+CREATE OR REFRESH MATERIALIZED VIEW ${catalog}.gold.gold_orders_by_state (
     CONSTRAINT positive_revenue
         EXPECT (total_revenue >= 0)
         ON VIOLATION FAIL UPDATE
@@ -62,8 +62,8 @@ AS SELECT
 
     current_timestamp() AS _refreshed_at
 
-FROM silver_orders_enriched o
-INNER JOIN silver_customers c ON o.customer_id = c.customer_id
+FROM ${catalog}.silver.silver_orders_enriched o
+INNER JOIN ${catalog}.silver.silver_customers c ON o.customer_id = c.customer_id
 WHERE o.order_date IS NOT NULL
 GROUP BY o.order_date, c.customer_state
 ORDER BY o.order_date DESC, total_revenue DESC;

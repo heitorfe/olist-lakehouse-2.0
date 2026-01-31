@@ -6,7 +6,7 @@
 -- Note: Initial seller load - CDC updates handled separately
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE bronze_sellers
+CREATE OR REFRESH STREAMING TABLE ${catalog}.bronze.bronze_sellers
 COMMENT 'Raw seller data ingested from CSV files via Auto Loader'
 TBLPROPERTIES (
     'quality' = 'bronze',

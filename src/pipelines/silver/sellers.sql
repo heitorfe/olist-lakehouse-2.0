@@ -6,7 +6,7 @@
 -- Data Quality: DROP rows with invalid seller_id
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE silver_sellers (
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_sellers (
     -- Data Quality Constraints (DROP invalid rows)
     CONSTRAINT valid_seller_id
         EXPECT (seller_id IS NOT NULL AND LENGTH(TRIM(seller_id)) = 32)
@@ -66,4 +66,4 @@ AS SELECT
     _file_modified_at,
     _ingested_at,
     current_timestamp() AS _processed_at
-FROM STREAM(bronze_sellers);
+FROM STREAM(${catalog}.bronze.bronze_sellers);

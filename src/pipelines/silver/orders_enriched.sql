@@ -6,7 +6,7 @@
 -- Pattern: Materialized view joining fact and dimension data
 -- =============================================================================
 
-CREATE OR REFRESH MATERIALIZED VIEW silver_orders_enriched
+CREATE OR REFRESH MATERIALIZED VIEW ${catalog}.silver.silver_orders_enriched
 COMMENT 'Enriched order data with aggregated items, payments, and review metrics'
 TBLPROPERTIES (
     'quality' = 'silver'
@@ -22,7 +22,7 @@ WITH order_items_agg AS (
         SUM(freight_value) AS total_freight,
         SUM(total_item_value) AS total_order_value,
         AVG(price) AS avg_item_price
-    FROM silver_order_items
+    FROM ${catalog}.silver.silver_order_items
     GROUP BY order_id
 ),
 order_payments_agg AS (
@@ -32,7 +32,7 @@ order_payments_agg AS (
         SUM(payment_value) AS total_payment_value,
         MAX(payment_installments) AS max_installments,
         COLLECT_SET(payment_type) AS payment_types
-    FROM silver_order_payments
+    FROM ${catalog}.silver.silver_order_payments
     GROUP BY order_id
 ),
 order_reviews_agg AS (
@@ -41,7 +41,7 @@ order_reviews_agg AS (
         MAX(review_score) AS review_score,
         MAX(sentiment) AS review_sentiment,
         MAX(has_comment) AS has_review_comment
-    FROM silver_order_reviews
+    FROM ${catalog}.silver.silver_order_reviews
     GROUP BY order_id
 )
 SELECT
@@ -96,7 +96,7 @@ SELECT
     -- Audit
     current_timestamp() AS _processed_at
 
-FROM silver_orders o
+FROM ${catalog}.silver.silver_orders o
 LEFT JOIN order_items_agg oi ON o.order_id = oi.order_id
 LEFT JOIN order_payments_agg op ON o.order_id = op.order_id
 LEFT JOIN order_reviews_agg r ON o.order_id = r.order_id;

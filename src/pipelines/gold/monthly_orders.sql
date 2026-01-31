@@ -6,7 +6,7 @@
 -- Grain: One row per month
 -- =============================================================================
 
-CREATE OR REFRESH MATERIALIZED VIEW gold_monthly_orders (
+CREATE OR REFRESH MATERIALIZED VIEW ${catalog}.gold.gold_monthly_orders (
     CONSTRAINT positive_revenue
         EXPECT (total_revenue >= 0)
         ON VIOLATION FAIL UPDATE
@@ -50,7 +50,7 @@ AS SELECT
 
     current_timestamp() AS _refreshed_at
 
-FROM silver_orders_enriched
+FROM ${catalog}.silver.silver_orders_enriched
 WHERE order_month IS NOT NULL
 GROUP BY order_month, order_year
 ORDER BY order_month DESC;

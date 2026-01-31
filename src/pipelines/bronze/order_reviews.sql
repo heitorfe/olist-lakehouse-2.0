@@ -6,7 +6,7 @@
 -- Pattern: Streaming table - reviews are immutable after submission
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE bronze_order_reviews
+CREATE OR REFRESH STREAMING TABLE ${catalog}.bronze.bronze_order_reviews
 COMMENT 'Raw order review data ingested from CSV files via Auto Loader'
 TBLPROPERTIES (
     'quality' = 'bronze',

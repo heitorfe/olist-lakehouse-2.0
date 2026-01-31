@@ -6,7 +6,7 @@
 -- Pattern: Streaming table capturing INSERT/UPDATE/DELETE operations
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE bronze_cdc_customers
+CREATE OR REFRESH STREAMING TABLE ${catalog}.bronze.bronze_cdc_customers
 COMMENT 'Raw CDC change feed for customer data'
 TBLPROPERTIES (
     'quality' = 'bronze',

@@ -9,7 +9,7 @@
 -- =============================================================================
 -- Staging: Validated CDC Events
 -- =============================================================================
-CREATE OR REFRESH STREAMING TABLE stg_cdc_sellers (
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.stg_cdc_sellers (
     CONSTRAINT valid_seller_id
         EXPECT (seller_id IS NOT NULL AND LENGTH(TRIM(seller_id)) = 32)
         ON VIOLATION DROP ROW,
@@ -31,13 +31,13 @@ AS SELECT
     INITCAP(TRIM(seller_city)) AS seller_city,
     UPPER(TRIM(seller_state)) AS seller_state,
     _ingested_at
-FROM STREAM(bronze_cdc_sellers);
+FROM STREAM(${catalog}.bronze.bronze_cdc_sellers);
 
 -- =============================================================================
 -- SCD Type 1: Current Seller State
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE silver_sellers_current
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_sellers_current
 COMMENT 'Current state of sellers (SCD Type 1) - Updated via AUTO CDC'
 TBLPROPERTIES (
     'quality' = 'silver',
@@ -45,8 +45,8 @@ TBLPROPERTIES (
 );
 
 CREATE FLOW sellers_current_flow
-AS AUTO CDC INTO silver_sellers_current
-FROM stream(stg_cdc_sellers)
+AS AUTO CDC INTO ${catalog}.silver.silver_sellers_current
+FROM stream(${catalog}.silver.stg_cdc_sellers)
 KEYS (seller_id)
 APPLY AS DELETE WHEN operation = 'DELETE'
 SEQUENCE BY sequence_number
@@ -57,7 +57,7 @@ STORED AS SCD TYPE 1;
 -- SCD Type 2: Seller History
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE silver_sellers_history
+CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_sellers_history
 COMMENT 'Historical seller changes (SCD Type 2) - Full audit trail via AUTO CDC'
 TBLPROPERTIES (
     'quality' = 'silver',
@@ -65,8 +65,8 @@ TBLPROPERTIES (
 );
 
 CREATE FLOW sellers_history_flow
-AS AUTO CDC INTO silver_sellers_history
-FROM stream(stg_cdc_sellers)
+AS AUTO CDC INTO ${catalog}.silver.silver_sellers_history
+FROM stream(${catalog}.silver.stg_cdc_sellers)
 KEYS (seller_id)
 APPLY AS DELETE WHEN operation = 'DELETE'
 SEQUENCE BY sequence_number

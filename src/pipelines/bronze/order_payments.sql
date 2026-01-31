@@ -6,7 +6,7 @@
 -- Pattern: Streaming table - payments are immutable after creation
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE bronze_order_payments
+CREATE OR REFRESH STREAMING TABLE ${catalog}.bronze.bronze_order_payments
 COMMENT 'Raw order payment data ingested from CSV files via Auto Loader'
 TBLPROPERTIES (
     'quality' = 'bronze',

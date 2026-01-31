@@ -6,7 +6,7 @@
 -- Pattern: Streaming table with schema inference
 -- =============================================================================
 
-CREATE OR REFRESH STREAMING TABLE bronze_customers
+CREATE OR REFRESH STREAMING TABLE ${catalog}.bronze.bronze_customers
 COMMENT 'Raw customer data ingested from CSV files via Auto Loader'
 TBLPROPERTIES (
     'quality' = 'bronze',
