@@ -4,7 +4,6 @@
 -- Description: Cleanses and validates customer data from bronze layer
 -- Source: bronze_customers
 -- Data Quality: DROP rows with invalid customer_id or customer_unique_id
--- PII Fields: customer_name, customer_email, customer_phone (for masking demo)
 -- =============================================================================
 
 CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_customers (
@@ -19,7 +18,7 @@ CREATE OR REFRESH STREAMING TABLE ${catalog}.silver.silver_customers (
         EXPECT (customer_zip_code_prefix IS NOT NULL)
         ON VIOLATION DROP ROW
 )
-COMMENT 'Cleansed customer data with validated IDs, normalized location, and PII fields for masking'
+COMMENT 'Cleansed customer data with validated IDs and normalized location'
 TBLPROPERTIES (
     'quality' = 'silver',
     'pipelines.autoOptimize.managed' = 'true'
@@ -33,11 +32,6 @@ AS SELECT
     CAST(customer_zip_code_prefix AS INT) AS customer_zip_code_prefix,
     INITCAP(TRIM(customer_city)) AS customer_city,
     UPPER(TRIM(customer_state)) AS customer_state,
-
-    -- PII fields (will be masked via Unity Catalog column masks)
-    TRIM(customer_name) AS customer_name,
-    LOWER(TRIM(customer_email)) AS customer_email,
-    TRIM(customer_phone) AS customer_phone,
 
     -- Audit columns
     _source_file,
