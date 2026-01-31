@@ -8,6 +8,7 @@
 # MAGIC 1. **Initial Load**: Generates base records for customers, products, and sellers
 # MAGIC 2. **CDC Batches**: Generates change events (INSERT, UPDATE, DELETE) with proper sequencing
 # MAGIC 3. **Realistic Data**: Uses Brazilian-style data (names, states, cities)
+# MAGIC 4. **PII Fields**: Generates customer PII (name, email, phone) for Unity Catalog masking demos
 # MAGIC
 # MAGIC ## Output Location:
 # MAGIC - Initial data: `/Volumes/{catalog}/raw/olist/{entity}/`
@@ -116,7 +117,6 @@ def generate_brazilian_name():
 def generate_email(first_name, last_name):
     """Generate a realistic email address based on name."""
     domain = random.choice(EMAIL_DOMAINS)
-    # Various email patterns
     patterns = [
         f"{first_name.lower()}.{last_name.lower()}",
         f"{first_name.lower()}{last_name.lower()}",
@@ -130,8 +130,7 @@ def generate_email(first_name, last_name):
 
 def generate_phone():
     """Generate a Brazilian mobile phone number."""
-    # Brazilian phone format: +55 (DD) 9XXXX-XXXX
-    ddd = random.randint(11, 99)  # Brazilian area codes
+    ddd = random.randint(11, 99)
     first_part = random.randint(1000, 9999)
     second_part = random.randint(1000, 9999)
     return f"+55 ({ddd}) 9{first_part}-{second_part}"
@@ -155,7 +154,6 @@ def generate_customers(count):
             'customer_zip_code_prefix': zip_prefix,
             'customer_city': city,
             'customer_state': state,
-            # PII fields for Unity Catalog masking demonstration
             'customer_name': f"{first_name} {last_name}",
             'customer_email': generate_email(first_name, last_name),
             'customer_phone': generate_phone()
@@ -199,7 +197,7 @@ def generate_geolocation():
     """Generate geolocation reference data."""
     geolocations = []
     for state, city in BRAZILIAN_STATES.items():
-        for _ in range(10):  # 10 entries per state
+        for _ in range(10):
             zip_prefix = random.randint(10000, 99999)
             geolocations.append({
                 'geolocation_zip_code_prefix': zip_prefix,
@@ -228,7 +226,6 @@ def generate_orders(count, customer_ids, seller_ids, product_ids):
         purchase_time = random_timestamp(start_date, end_date)
         status = random.choice(ORDER_STATUSES)
 
-        # Order
         order = {
             'order_id': order_id,
             'customer_id': customer_id,
@@ -241,7 +238,6 @@ def generate_orders(count, customer_ids, seller_ids, product_ids):
         }
         orders.append(order)
 
-        # Order Items (1-5 items per order)
         num_items = random.randint(1, 5)
         for item_id in range(1, num_items + 1):
             order_items.append({
@@ -254,7 +250,6 @@ def generate_orders(count, customer_ids, seller_ids, product_ids):
                 'freight_value': round(random.uniform(5, 100), 2)
             })
 
-        # Order Payments (1-3 payments per order)
         num_payments = random.randint(1, 3)
         total_value = sum(item['price'] + item['freight_value'] for item in order_items if item['order_id'] == order_id)
         payment_per = total_value / num_payments
@@ -267,7 +262,6 @@ def generate_orders(count, customer_ids, seller_ids, product_ids):
                 'payment_value': round(payment_per, 2)
             })
 
-        # Order Review (if delivered)
         if status == 'delivered' and random.random() > 0.3:
             review_date = purchase_time + timedelta(days=random.randint(10, 60))
             order_reviews.append({
@@ -307,14 +301,11 @@ def generate_cdc_batch(existing_records, entity_type, batch_num, changes_count):
         sequence_number = base_sequence + i
         change_time = base_time + timedelta(seconds=i)
 
-        # Decide operation: 60% UPDATE, 30% INSERT, 10% DELETE
         operation_roll = random.random()
         if operation_roll < 0.6 and existing_records:
-            # UPDATE existing record
             operation = 'UPDATE'
             record = random.choice(existing_records).copy()
         elif operation_roll < 0.9:
-            # INSERT new record
             operation = 'INSERT'
             if entity_type == 'customers':
                 state, city, zip_prefix = random_brazilian_location()
@@ -351,21 +342,18 @@ def generate_cdc_batch(existing_records, entity_type, batch_num, changes_count):
                 }
             existing_records.append(record)
         else:
-            # DELETE existing record
             if existing_records:
                 operation = 'DELETE'
                 record = random.choice(existing_records).copy()
             else:
                 continue
 
-        # Apply changes for UPDATE operations
         if operation == 'UPDATE':
             if entity_type == 'customers':
                 state, city, zip_prefix = random_brazilian_location()
                 record['customer_city'] = city
                 record['customer_state'] = state
                 record['customer_zip_code_prefix'] = zip_prefix
-                # Occasionally update email or phone (simulating contact info changes)
                 if random.random() < 0.3:
                     first_name, last_name = generate_brazilian_name()
                     record['customer_email'] = generate_email(first_name, last_name)
@@ -379,7 +367,6 @@ def generate_cdc_batch(existing_records, entity_type, batch_num, changes_count):
                 record['seller_city'] = city
                 record['seller_state'] = state
 
-        # Add CDC metadata
         change_record = {
             'sequence_number': sequence_number,
             'operation': operation,
@@ -416,29 +403,25 @@ def save_to_csv(data, path, filename):
 
 # COMMAND ----------
 
-# Generate initial load data
 print("=" * 60)
 print("GENERATING INITIAL LOAD DATA")
 print("=" * 60)
 
-# Generate base entities
 customers = generate_customers(INITIAL_CUSTOMERS)
 products = generate_products(INITIAL_PRODUCTS)
 sellers = generate_sellers(INITIAL_SELLERS)
 geolocations = generate_geolocation()
 
-# Get IDs for order generation
 customer_ids = [c['customer_id'] for c in customers]
 product_ids = [p['product_id'] for p in products]
 seller_ids = [s['seller_id'] for s in sellers]
 
-# Generate transactional data
 orders, order_items, order_payments, order_reviews = generate_orders(
     INITIAL_ORDERS, customer_ids, seller_ids, product_ids
 )
 
 print(f"\nGenerated:")
-print(f"  - {len(customers)} customers")
+print(f"  - {len(customers)} customers (with PII: name, email, phone)")
 print(f"  - {len(products)} products")
 print(f"  - {len(sellers)} sellers")
 print(f"  - {len(geolocations)} geolocation records")
@@ -449,7 +432,6 @@ print(f"  - {len(order_reviews)} order reviews")
 
 # COMMAND ----------
 
-# Save initial load data
 print("\n" + "=" * 60)
 print("SAVING INITIAL LOAD DATA")
 print("=" * 60)
@@ -465,7 +447,6 @@ save_to_csv(order_reviews, f"{VOLUME_PATH}/order_reviews", "order_reviews_initia
 
 # COMMAND ----------
 
-# Generate and save CDC batches
 print("\n" + "=" * 60)
 print("GENERATING CDC BATCHES")
 print("=" * 60)
@@ -473,12 +454,10 @@ print("=" * 60)
 for batch in range(CDC_BATCHES):
     print(f"\n--- Batch {batch + 1} ---")
 
-    # Generate CDC events
     customer_changes = generate_cdc_batch(customers, 'customers', batch, CHANGES_PER_BATCH)
     product_changes = generate_cdc_batch(products, 'products', batch, CHANGES_PER_BATCH)
     seller_changes = generate_cdc_batch(sellers, 'sellers', batch, CHANGES_PER_BATCH)
 
-    # Save CDC batches
     save_to_csv(customer_changes, f"{VOLUME_PATH}/cdc/customers", f"customers_cdc_batch_{batch + 1}.csv")
     save_to_csv(product_changes, f"{VOLUME_PATH}/cdc/products", f"products_cdc_batch_{batch + 1}.csv")
     save_to_csv(seller_changes, f"{VOLUME_PATH}/cdc/sellers", f"sellers_cdc_batch_{batch + 1}.csv")
@@ -494,7 +473,6 @@ print("=" * 60)
 
 # COMMAND ----------
 
-# List generated files
 print("Generated files in volume:")
 for entity in ['customers', 'products', 'sellers', 'orders', 'order_items', 'order_payments', 'order_reviews', 'geolocation']:
     try:
@@ -505,7 +483,6 @@ for entity in ['customers', 'products', 'sellers', 'orders', 'order_items', 'ord
     except Exception as e:
         print(f"\n{entity}/: No files yet")
 
-# CDC directories
 print("\n\nCDC directories:")
 for entity in ['customers', 'products', 'sellers']:
     try:
@@ -526,7 +503,7 @@ for entity in ['customers', 'products', 'sellers']:
 # MAGIC ### Initial Load (Append-Only)
 # MAGIC | Entity | Records | Description |
 # MAGIC |--------|---------|-------------|
-# MAGIC | customers | 1,000 | Customer profiles |
+# MAGIC | customers | 1,000 | Customer profiles with PII (name, email, phone) |
 # MAGIC | products | 500 | Product catalog |
 # MAGIC | sellers | 100 | Seller profiles |
 # MAGIC | orders | 5,000 | Order transactions |
@@ -542,7 +519,15 @@ for entity in ['customers', 'products', 'sellers']:
 # MAGIC | 2 | 50 | INSERT, UPDATE, DELETE |
 # MAGIC | 3 | 50 | INSERT, UPDATE, DELETE |
 # MAGIC
+# MAGIC ### PII Fields (for Unity Catalog Masking)
+# MAGIC | Field | Description | Masking Strategy |
+# MAGIC |-------|-------------|------------------|
+# MAGIC | customer_name | Full name (first + last) | Partial mask: "J*** Silva" |
+# MAGIC | customer_email | Email address | Partial mask: "jo****@gmail.com" |
+# MAGIC | customer_phone | Brazilian mobile number | Partial mask: "+55 (11) 9****-****" |
+# MAGIC
 # MAGIC ### Next Steps
 # MAGIC 1. Run the Lakeflow pipeline to process initial load
-# MAGIC 2. Trigger pipeline updates to process CDC batches
-# MAGIC 3. Query SCD Type 1 and Type 2 tables to verify CDC processing
+# MAGIC 2. Apply Unity Catalog column masks for PII protection
+# MAGIC 3. Configure row filters based on user groups
+# MAGIC 4. Query silver tables to verify masked data
