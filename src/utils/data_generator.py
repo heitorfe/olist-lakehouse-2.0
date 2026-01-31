@@ -31,25 +31,15 @@ from pyspark.sql.types import *
 CATALOG = dbutils.widgets.get("catalog")
 VOLUME_PATH = f"/Volumes/{CATALOG}/raw/olist"
 
-# Data generation settings - ranges for variability
-# Each run will generate a random count within these ranges
-CUSTOMERS_RANGE = (800, 1200)
-PRODUCTS_RANGE = (400, 600)
-SELLERS_RANGE = (80, 120)
-ORDERS_RANGE = (4000, 6000)
+# Data generation settings
+INITIAL_CUSTOMERS = 1000
+INITIAL_PRODUCTS = 500
+INITIAL_SELLERS = 100
+INITIAL_ORDERS = 5000
 
 # CDC settings
 CDC_BATCHES = 3
-CDC_CHANGES_RANGE = (40, 60)
-
-# Data quality settings - introduce noise for DQ testing
-# Approximately 2% of records will have data quality issues
-BAD_DATA_RATE = 0.02
-
-
-def get_random_count(range_tuple):
-    """Get a random count within the specified range."""
-    return random.randint(range_tuple[0], range_tuple[1])
+CHANGES_PER_BATCH = 50
 
 print(f"Catalog: {CATALOG}")
 print(f"Volume Path: {VOLUME_PATH}")
@@ -117,82 +107,33 @@ def random_timestamp(start_date, end_date):
     return start_date + timedelta(days=random_days, seconds=random_seconds)
 
 
-def introduce_bad_data(record, entity_type, bad_data_rate=BAD_DATA_RATE):
-    """
-    Introduces data quality issues for testing DQ expectations.
+def generate_brazilian_name():
+    """Generate a random Brazilian full name."""
+    first_name = random.choice(BRAZILIAN_FIRST_NAMES)
+    last_name = random.choice(BRAZILIAN_LAST_NAMES)
+    return first_name, last_name
 
-    This function randomly corrupts records to test that the Data Quality
-    constraints in the silver layer properly catch and drop invalid rows.
 
-    Args:
-        record: The data record dictionary
-        entity_type: Type of entity (customer, product, seller, order, etc.)
-        bad_data_rate: Probability of introducing bad data (default 2%)
+def generate_email(first_name, last_name):
+    """Generate a realistic email address based on name."""
+    domain = random.choice(EMAIL_DOMAINS)
+    patterns = [
+        f"{first_name.lower()}.{last_name.lower()}",
+        f"{first_name.lower()}{last_name.lower()}",
+        f"{first_name.lower()}.{last_name.lower()}{random.randint(10, 99)}",
+        f"{first_name.lower()}_{last_name.lower()}",
+        f"{first_name.lower()[0]}{last_name.lower()}"
+    ]
+    local_part = random.choice(patterns)
+    return f"{local_part}@{domain}"
 
-    Returns:
-        The record, potentially with data quality issues
-    """
-    if random.random() >= bad_data_rate:
-        return record  # Keep clean
 
-    # Violation types mapped to DQ rules in silver layer
-    if entity_type == 'customer':
-        violation = random.choice(['null_id', 'short_id', 'null_zip'])
-        if violation == 'null_id':
-            record['customer_id'] = None
-        elif violation == 'short_id':
-            record['customer_id'] = 'INVALID_SHORT'  # Not 32 chars
-        elif violation == 'null_zip':
-            record['customer_zip_code_prefix'] = None
-
-    elif entity_type == 'product':
-        violation = random.choice(['null_id', 'negative_weight', 'negative_dimension'])
-        if violation == 'null_id':
-            record['product_id'] = None
-        elif violation == 'negative_weight':
-            record['product_weight_g'] = -random.randint(1, 1000)
-        elif violation == 'negative_dimension':
-            dim = random.choice(['product_length_cm', 'product_height_cm', 'product_width_cm'])
-            record[dim] = -random.randint(1, 50)
-
-    elif entity_type == 'seller':
-        violation = random.choice(['null_id', 'short_id'])
-        if violation == 'null_id':
-            record['seller_id'] = None
-        elif violation == 'short_id':
-            record['seller_id'] = 'BAD_SELLER'  # Not 32 chars
-
-    elif entity_type == 'order':
-        violation = random.choice(['null_id', 'invalid_status', 'null_timestamp'])
-        if violation == 'null_id':
-            record['order_id'] = None
-        elif violation == 'invalid_status':
-            record['order_status'] = 'INVALID_STATUS_XYZ'
-        elif violation == 'null_timestamp':
-            record['order_purchase_timestamp'] = None
-
-    elif entity_type == 'order_item':
-        violation = random.choice(['negative_price', 'negative_freight'])
-        if violation == 'negative_price':
-            record['price'] = -round(random.uniform(1, 100), 2)
-        elif violation == 'negative_freight':
-            record['freight_value'] = -round(random.uniform(1, 50), 2)
-
-    elif entity_type == 'order_payment':
-        violation = random.choice(['invalid_type', 'negative_value'])
-        if violation == 'invalid_type':
-            record['payment_type'] = 'INVALID_PAYMENT_TYPE'
-        elif violation == 'negative_value':
-            record['payment_value'] = -round(random.uniform(1, 100), 2)
-
-    elif entity_type == 'order_review':
-        violation = random.choice(['invalid_score_low', 'invalid_score_high'])
-        if violation == 'invalid_score_low':
-            record['review_score'] = 0  # Should be 1-5
-        elif violation == 'invalid_score_high':
-            record['review_score'] = random.randint(6, 10)  # Should be 1-5
-
-    return record
+def generate_phone():
+    """Generate a Brazilian mobile phone number."""
+    ddd = random.randint(11, 99)
+    first_part = random.randint(1000, 9999)
+    second_part = random.randint(1000, 9999)
+    return f"+55 ({ddd}) 9{first_part}-{second_part}"
 
 # COMMAND ----------
 
@@ -201,29 +142,30 @@ def introduce_bad_data(record, entity_type, bad_data_rate=BAD_DATA_RATE):
 
 # COMMAND ----------
 
-def generate_customers(count, apply_bad_data=True):
-    """Generate initial customer data with optional data quality issues."""
+def generate_customers(count):
+    """Generate initial customer data with PII fields."""
     customers = []
     for _ in range(count):
         state, city, zip_prefix = random_brazilian_location()
-        customer = {
+        first_name, last_name = generate_brazilian_name()
+        customers.append({
             'customer_id': generate_uuid(),
             'customer_unique_id': generate_uuid(),
             'customer_zip_code_prefix': zip_prefix,
             'customer_city': city,
-            'customer_state': state
-        }
-        if apply_bad_data:
-            customer = introduce_bad_data(customer, 'customer')
-        customers.append(customer)
+            'customer_state': state,
+            'customer_name': f"{first_name} {last_name}",
+            'customer_email': generate_email(first_name, last_name),
+            'customer_phone': generate_phone()
+        })
     return customers
 
 
-def generate_products(count, apply_bad_data=True):
-    """Generate initial product data with optional data quality issues."""
+def generate_products(count):
+    """Generate initial product data."""
     products = []
     for _ in range(count):
-        product = {
+        products.append({
             'product_id': generate_uuid(),
             'product_category_name': random.choice(PRODUCT_CATEGORIES),
             'product_name_lenght': random.randint(10, 100),
@@ -233,27 +175,21 @@ def generate_products(count, apply_bad_data=True):
             'product_length_cm': random.randint(5, 100),
             'product_height_cm': random.randint(5, 100),
             'product_width_cm': random.randint(5, 100)
-        }
-        if apply_bad_data:
-            product = introduce_bad_data(product, 'product')
-        products.append(product)
+        })
     return products
 
 
-def generate_sellers(count, apply_bad_data=True):
-    """Generate initial seller data with optional data quality issues."""
+def generate_sellers(count):
+    """Generate initial seller data."""
     sellers = []
     for _ in range(count):
         state, city, zip_prefix = random_brazilian_location()
-        seller = {
+        sellers.append({
             'seller_id': generate_uuid(),
             'seller_zip_code_prefix': zip_prefix,
             'seller_city': city,
             'seller_state': state
-        }
-        if apply_bad_data:
-            seller = introduce_bad_data(seller, 'seller')
-        sellers.append(seller)
+        })
     return sellers
 
 
@@ -274,7 +210,7 @@ def generate_geolocation():
 
 # COMMAND ----------
 
-def generate_orders(count, customer_ids, seller_ids, product_ids, apply_bad_data=True):
+def generate_orders(count, customer_ids, seller_ids, product_ids):
     """Generate order data with related items, payments, and reviews."""
     orders = []
     order_items = []
@@ -300,13 +236,11 @@ def generate_orders(count, customer_ids, seller_ids, product_ids, apply_bad_data
             'order_delivered_customer_date': (purchase_time + timedelta(days=random.randint(5, 30))).isoformat() if status == 'delivered' else None,
             'order_estimated_delivery_date': (purchase_time + timedelta(days=random.randint(7, 45))).isoformat()
         }
-        if apply_bad_data:
-            order = introduce_bad_data(order, 'order')
         orders.append(order)
 
         num_items = random.randint(1, 5)
         for item_id in range(1, num_items + 1):
-            item = {
+            order_items.append({
                 'order_id': order_id,
                 'order_item_id': item_id,
                 'product_id': random.choice(product_ids),
@@ -314,29 +248,23 @@ def generate_orders(count, customer_ids, seller_ids, product_ids, apply_bad_data
                 'shipping_limit_date': (purchase_time + timedelta(days=random.randint(1, 7))).isoformat(),
                 'price': round(random.uniform(10, 1000), 2),
                 'freight_value': round(random.uniform(5, 100), 2)
-            }
-            if apply_bad_data:
-                item = introduce_bad_data(item, 'order_item')
-            order_items.append(item)
+            })
 
         num_payments = random.randint(1, 3)
         total_value = sum(item['price'] + item['freight_value'] for item in order_items if item['order_id'] == order_id)
         payment_per = total_value / num_payments
         for seq in range(1, num_payments + 1):
-            payment = {
+            order_payments.append({
                 'order_id': order_id,
                 'payment_sequential': seq,
                 'payment_type': random.choice(PAYMENT_TYPES),
                 'payment_installments': random.randint(1, 12),
                 'payment_value': round(payment_per, 2)
-            }
-            if apply_bad_data:
-                payment = introduce_bad_data(payment, 'order_payment')
-            order_payments.append(payment)
+            })
 
         if status == 'delivered' and random.random() > 0.3:
             review_date = purchase_time + timedelta(days=random.randint(10, 60))
-            review = {
+            order_reviews.append({
                 'review_id': generate_uuid(),
                 'order_id': order_id,
                 'review_score': random.randint(1, 5),
@@ -344,10 +272,7 @@ def generate_orders(count, customer_ids, seller_ids, product_ids, apply_bad_data
                 'review_comment_message': 'This is a review comment.' if random.random() > 0.5 else None,
                 'review_creation_date': review_date.isoformat(),
                 'review_answer_timestamp': (review_date + timedelta(days=random.randint(1, 7))).isoformat()
-            }
-            if apply_bad_data:
-                review = introduce_bad_data(review, 'order_review')
-            order_reviews.append(review)
+            })
 
     return orders, order_items, order_payments, order_reviews
 
@@ -482,32 +407,17 @@ print("=" * 60)
 print("GENERATING INITIAL LOAD DATA")
 print("=" * 60)
 
-# Generate random counts within configured ranges
-num_customers = get_random_count(CUSTOMERS_RANGE)
-num_products = get_random_count(PRODUCTS_RANGE)
-num_sellers = get_random_count(SELLERS_RANGE)
-num_orders = get_random_count(ORDERS_RANGE)
-
-print(f"\nTarget counts (with variability):")
-print(f"  - Customers: {num_customers} (range: {CUSTOMERS_RANGE})")
-print(f"  - Products: {num_products} (range: {PRODUCTS_RANGE})")
-print(f"  - Sellers: {num_sellers} (range: {SELLERS_RANGE})")
-print(f"  - Orders: {num_orders} (range: {ORDERS_RANGE})")
-print(f"  - Bad data rate: {BAD_DATA_RATE:.1%}")
-
-# Generate base entities
-customers = generate_customers(num_customers)
-products = generate_products(num_products)
-sellers = generate_sellers(num_sellers)
+customers = generate_customers(INITIAL_CUSTOMERS)
+products = generate_products(INITIAL_PRODUCTS)
+sellers = generate_sellers(INITIAL_SELLERS)
 geolocations = generate_geolocation()
 
-# Get IDs for order generation (filter out None IDs from bad data)
-customer_ids = [c['customer_id'] for c in customers if c['customer_id'] is not None]
-product_ids = [p['product_id'] for p in products if p['product_id'] is not None]
-seller_ids = [s['seller_id'] for s in sellers if s['seller_id'] is not None]
+customer_ids = [c['customer_id'] for c in customers]
+product_ids = [p['product_id'] for p in products]
+seller_ids = [s['seller_id'] for s in sellers]
 
 orders, order_items, order_payments, order_reviews = generate_orders(
-    num_orders, customer_ids, seller_ids, product_ids
+    INITIAL_ORDERS, customer_ids, seller_ids, product_ids
 )
 
 print(f"\nGenerated:")
@@ -542,14 +452,11 @@ print("GENERATING CDC BATCHES")
 print("=" * 60)
 
 for batch in range(CDC_BATCHES):
-    # Generate random change count for this batch
-    changes_count = get_random_count(CDC_CHANGES_RANGE)
-    print(f"\n--- Batch {batch + 1} ({changes_count} changes per entity) ---")
+    print(f"\n--- Batch {batch + 1} ---")
 
-    # Generate CDC events
-    customer_changes = generate_cdc_batch(customers, 'customers', batch, changes_count)
-    product_changes = generate_cdc_batch(products, 'products', batch, changes_count)
-    seller_changes = generate_cdc_batch(sellers, 'sellers', batch, changes_count)
+    customer_changes = generate_cdc_batch(customers, 'customers', batch, CHANGES_PER_BATCH)
+    product_changes = generate_cdc_batch(products, 'products', batch, CHANGES_PER_BATCH)
+    seller_changes = generate_cdc_batch(sellers, 'sellers', batch, CHANGES_PER_BATCH)
 
     save_to_csv(customer_changes, f"{VOLUME_PATH}/cdc/customers", f"customers_cdc_batch_{batch + 1}.csv")
     save_to_csv(product_changes, f"{VOLUME_PATH}/cdc/products", f"products_cdc_batch_{batch + 1}.csv")
@@ -593,27 +500,24 @@ for entity in ['customers', 'products', 'sellers']:
 # MAGIC
 # MAGIC The data generator has created:
 # MAGIC
-# MAGIC ### Initial Load (with Variability)
-# MAGIC | Entity | Range | Description |
-# MAGIC |--------|-------|-------------|
-# MAGIC | customers | 800-1,200 | Customer profiles |
-# MAGIC | products | 400-600 | Product catalog |
-# MAGIC | sellers | 80-120 | Seller profiles |
-# MAGIC | orders | 4,000-6,000 | Order transactions |
-# MAGIC | order_items | ~12,000-18,000 | Order line items |
-# MAGIC | order_payments | ~6,000-9,000 | Payment records |
-# MAGIC | order_reviews | ~1,600-2,400 | Customer reviews |
+# MAGIC ### Initial Load (Append-Only)
+# MAGIC | Entity | Records | Description |
+# MAGIC |--------|---------|-------------|
+# MAGIC | customers | 1,000 | Customer profiles with PII (name, email, phone) |
+# MAGIC | products | 500 | Product catalog |
+# MAGIC | sellers | 100 | Seller profiles |
+# MAGIC | orders | 5,000 | Order transactions |
+# MAGIC | order_items | ~15,000 | Order line items |
+# MAGIC | order_payments | ~7,500 | Payment records |
+# MAGIC | order_reviews | ~2,000 | Customer reviews |
 # MAGIC | geolocation | 120 | Geographic reference |
 # MAGIC
-# MAGIC ### CDC Batches (with Variability)
+# MAGIC ### CDC Batches
 # MAGIC | Batch | Changes per Entity | Operations |
 # MAGIC |-------|-------------------|------------|
-# MAGIC | 1-3 | 40-60 (random) | INSERT, UPDATE, DELETE |
-# MAGIC
-# MAGIC ### Data Quality Testing
-# MAGIC - **Bad Data Rate:** ~2% of records contain data quality issues
-# MAGIC - **Purpose:** Test DQ expectations in silver layer
-# MAGIC - **Violation Types:** NULL IDs, invalid lengths, negative values, invalid enums
+# MAGIC | 1 | 50 | INSERT, UPDATE, DELETE |
+# MAGIC | 2 | 50 | INSERT, UPDATE, DELETE |
+# MAGIC | 3 | 50 | INSERT, UPDATE, DELETE |
 # MAGIC
 # MAGIC ### PII Fields (for Unity Catalog Masking)
 # MAGIC | Field | Description | Masking Strategy |
@@ -624,6 +528,6 @@ for entity in ['customers', 'products', 'sellers']:
 # MAGIC
 # MAGIC ### Next Steps
 # MAGIC 1. Run the Lakeflow pipeline to process initial load
-# MAGIC 2. Verify Data Quality expectations catch bad records
-# MAGIC 3. Trigger pipeline updates to process CDC batches
-# MAGIC 4. Query SCD Type 1 and Type 2 tables to verify CDC processing
+# MAGIC 2. Apply Unity Catalog column masks for PII protection
+# MAGIC 3. Configure row filters based on user groups
+# MAGIC 4. Query silver tables to verify masked data
