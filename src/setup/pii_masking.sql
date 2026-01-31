@@ -19,7 +19,7 @@
 -- Masks name to show only first initial and last name
 -- Example: "Joao Silva" -> "J*** Silva"
 -- =============================================================================
-CREATE OR REPLACE FUNCTION ${catalog}.silver.mask_customer_name(name STRING)
+CREATE OR REPLACE FUNCTION olist_dev.silver.mask_customer_name(name STRING)
 RETURNS STRING
 RETURN CASE
     WHEN IS_ACCOUNT_GROUP_MEMBER('pii-readers') THEN name
@@ -38,7 +38,7 @@ END;
 -- Masks email to show only first 2 chars and domain
 -- Example: "joao.silva@gmail.com" -> "jo****@gmail.com"
 -- =============================================================================
-CREATE OR REPLACE FUNCTION ${catalog}.silver.mask_customer_email(email STRING)
+CREATE OR REPLACE FUNCTION olist_dev.silver.mask_customer_email(email STRING)
 RETURNS STRING
 RETURN CASE
     WHEN IS_ACCOUNT_GROUP_MEMBER('pii-readers') THEN email
@@ -57,7 +57,7 @@ END;
 -- Masks phone to show only country/area code
 -- Example: "+55 (11) 91234-5678" -> "+55 (11) 9****-****"
 -- =============================================================================
-CREATE OR REPLACE FUNCTION ${catalog}.silver.mask_customer_phone(phone STRING)
+CREATE OR REPLACE FUNCTION olist_dev.silver.mask_customer_phone(phone STRING)
 RETURNS STRING
 RETURN CASE
     WHEN IS_ACCOUNT_GROUP_MEMBER('pii-readers') THEN phone
@@ -78,7 +78,7 @@ END;
 -- - region-south: RS, PR, SC
 -- - Others: No access (returns false)
 -- =============================================================================
-CREATE OR REPLACE FUNCTION ${catalog}.silver.filter_customer_by_region(customer_state STRING)
+CREATE OR REPLACE FUNCTION olist_dev.silver.filter_customer_by_region(customer_state STRING)
 RETURNS BOOLEAN
 RETURN CASE
     WHEN IS_ACCOUNT_GROUP_MEMBER('admin') THEN TRUE
