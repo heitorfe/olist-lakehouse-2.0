@@ -75,7 +75,9 @@ olist-lakehouse-2.0/
 │
 ├── src/
 │   ├── setup/
-│   │   └── unity_catalog_setup.py   # Unity Catalog initialization
+│   │   ├── unity_catalog_setup.py   # Unity Catalog initialization
+│   │   ├── pii_masking.sql          # Column mask & row filter functions
+│   │   └── apply_masks.sql          # Apply masks to tables
 │   │
 │   ├── pipelines/
 │   │   ├── bronze/             # AutoLoader ingestion (8 tables)
@@ -113,10 +115,6 @@ olist-lakehouse-2.0/
 │   │   │   ├── cdc_products_silver.sql
 │   │   │   ├── cdc_sellers_bronze.sql
 │   │   │   └── cdc_sellers_silver.sql
-│   │   │
-│   │   └── security/           # PII masking (2 files)
-│   │       ├── pii_masking.sql     # Column mask & row filter functions
-│   │       └── apply_masks.sql     # Apply masks to tables
 │   │
 │   └── utils/
 │       └── data_generator.py   # Synthetic data generator (with PII)

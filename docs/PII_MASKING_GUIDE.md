@@ -79,7 +79,7 @@ Users are granted access based on Unity Catalog group membership:
 
 ## Column Masking Functions
 
-Located in: `src/pipelines/security/pii_masking.sql`
+Located in: `src/setup/pii_masking.sql`
 
 ### mask_customer_name
 
@@ -143,7 +143,7 @@ END;
 
 ## Applying Masks to Tables
 
-Located in: `src/pipelines/security/apply_masks.sql`
+Located in: `src/setup/apply_masks.sql`
 
 Run this **after** the Lakeflow pipeline creates the tables:
 
@@ -180,7 +180,7 @@ Run `pii_masking.sql` in Databricks SQL:
 
 ```bash
 # In Databricks UI or via CLI
-databricks workspace import src/pipelines/security/pii_masking.sql
+databricks workspace import src/setup/pii_masking.sql
 ```
 
 ### 3. Apply Masks to Tables
