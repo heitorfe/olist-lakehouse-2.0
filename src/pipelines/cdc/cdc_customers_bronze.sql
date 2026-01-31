@@ -24,6 +24,9 @@ AS SELECT
     customer_zip_code_prefix,
     customer_city,
     customer_state,
+    customer_email,
+    customer_name,
+    customer_phone,
 
     -- Ingestion metadata
     _metadata.file_path AS _source_file,
